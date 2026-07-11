@@ -72,7 +72,10 @@
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Montant du jour</div>
-      <div class="kpi-value">{{ format_montant(ca_jour) }}</div>
+      <div class="kpi-value">
+        ${{ "%.2f"|format(ca_jour / params.taux_change_usd_fc if params.taux_change_usd_fc else ca_jour) }}
+        <small class="kpi-equiv">{{ "{:,.0f}".format(ca_jour).replace(",", " ") }} FC</small>
+      </div>
     </div>
   </div>
 

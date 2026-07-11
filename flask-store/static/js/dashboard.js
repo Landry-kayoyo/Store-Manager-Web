@@ -26,31 +26,18 @@ function loadStats() {
     .catch(err => console.error('Erreur chargement stats:', err));
 }
 
-/* ── Formate un montant dans la devise principale avec équivalent ── */
+/* ── $ en gros, FC en petit dessous — toujours ── */
 function fmt(val) {
-  if (_devise === 'FC') {
-    const fc  = Math.round(val).toLocaleString('fr-FR') + ' FC';
-    const usd = '$' + (val / _taux).toFixed(2);
-    return `${fc} <small class="kpi-equiv">${usd}</small>`;
-  } else {
-    const usd = '$' + Number(val).toFixed(2);
-    const fc  = Math.round(val * _taux).toLocaleString('fr-FR') + ' FC';
-    return `${usd} <small class="kpi-equiv">${fc}</small>`;
-  }
+  const fc  = _devise === 'FC' ? val : val * _taux;
+  const usd = _devise === 'USD' ? val : val / _taux;
+  return `$${usd.toFixed(2)} <small class="kpi-equiv">${Math.round(fc).toLocaleString('fr-FR')} FC</small>`;
 }
 
-/* Version texte simple (tooltips, pas de HTML) */
-function fmtText(val, devise) {
-  const d = devise || _devise;
-  if (d === 'FC') return Math.round(val).toLocaleString('fr-FR') + ' FC';
-  return '$' + Number(val).toFixed(2);
-}
-
-/* Version courte pour les axes */
+/* Version courte pour axes graphiques */
 function fmtCourt(val) {
-  if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
-  if (val >= 1000)    return (val/1000).toFixed(0) + 'k';
-  return String(Math.round(val));
+  if (val >= 1000000) return '$' + (val/1000000).toFixed(1) + 'M';
+  if (val >= 1000)    return '$' + (val/1000).toFixed(0) + 'k';
+  return '$' + Math.round(val);
 }
 
 /* ── KPIs ─────────────────────────────────────────────── */
@@ -59,25 +46,21 @@ function fillKPIs(d) {
   setText('kpi-ventes-val', d.nb_ventes_jour);
   setText('kpi-stock-val',  d.stock_bas_count);
   setText('kpi-agents-val', d.agents_actifs);
-
-  /* Statistiques page */
-  setHtml('s-ca-jour',  fmt(d.ca_jour));
-  setText('s-nb-jour',  d.nb_ventes_jour);
-  setText('s-stock-bas', d.stock_bas_count);
-  setText('s-agents',   d.agents_actifs);
 }
 
 /* ── Graphique ventes 7j ─────────────────────────────── */
 function renderChartVentes(ventes7j) {
   const el = document.getElementById('chartVentes');
   if (!el) return;
+  // Convertit en USD pour l'axe (valeur stockée en devise active)
+  const toUsd = v => _devise === 'FC' ? v / _taux : v;
   new Chart(el, {
     type: 'line',
     data: {
       labels: ventes7j.map(v => v.date),
       datasets: [{
         label: 'Ventes',
-        data: ventes7j.map(v => v.montant),
+        data: ventes7j.map(v => toUsd(v.montant)),
         borderColor: GREEN, backgroundColor: 'rgba(26,58,42,.08)',
         fill: true, tension: 0.4, pointBackgroundColor: GREEN, pointRadius: 4,
       }]
@@ -89,12 +72,9 @@ function renderChartVentes(ventes7j) {
         tooltip: {
           callbacks: {
             label: ctx => {
-              const fc = _devise === 'FC' ? ctx.raw : ctx.raw * _taux;
-              const usd = _devise === 'USD' ? ctx.raw : ctx.raw / _taux;
-              return [
-                ' ' + Math.round(fc).toLocaleString('fr-FR') + ' FC',
-                ' $' + usd.toFixed(2),
-              ];
+              const usd = ctx.raw;
+              const fc  = Math.round(usd * _taux).toLocaleString('fr-FR');
+              return [` $${usd.toFixed(2)}`, ` ${fc} FC`];
             }
           }
         }
@@ -114,12 +94,13 @@ function renderChartVentes(ventes7j) {
 function renderChartCategories(cats) {
   const el = document.getElementById('chartCategories');
   if (!el || !cats.length) return;
+  const toUsd = v => _devise === 'FC' ? v / _taux : v;
   new Chart(el, {
     type: 'doughnut',
     data: {
       labels: cats.map(c => c.categorie),
       datasets: [{
-        data: cats.map(c => c.montant),
+        data: cats.map(c => toUsd(c.montant)),
         backgroundColor: PALETTE,
         borderWidth: 2, borderColor: '#fff',
       }]
@@ -131,9 +112,9 @@ function renderChartCategories(cats) {
         tooltip: {
           callbacks: {
             label: ctx => {
-              const fc = _devise === 'FC' ? ctx.raw : ctx.raw * _taux;
-              const usd = _devise === 'USD' ? ctx.raw : ctx.raw / _taux;
-              return ` ${ctx.label}: ${Math.round(fc).toLocaleString('fr-FR')} FC / $${usd.toFixed(2)}`;
+              const usd = ctx.raw;
+              const fc  = Math.round(usd * _taux).toLocaleString('fr-FR');
+              return ` ${ctx.label}: $${usd.toFixed(2)} / ${fc} FC`;
             }
           }
         }
@@ -161,8 +142,8 @@ function renderTopAgents(agents) {
       ${av}
       <div class="top-agent-info"><div class="top-agent-name">${esc(a.nom)}</div></div>
       <div class="top-agent-amount">
-        ${Math.round(fc).toLocaleString('fr-FR')} FC
-        <small class="kpi-equiv">$${usd.toFixed(2)}</small>
+        $${usd.toFixed(2)}
+        <small class="kpi-equiv">${Math.round(fc).toLocaleString('fr-FR')} FC</small>
       </div>
     </div>`;
   }).join('');
