@@ -1,0 +1,200 @@
+Crée une application web interne de gestion de magasin (produits variés : matériel 
+informatique, accessoires, et autres) en Python Flask, conçue pour être hébergée 
+sur PythonAnywhere.
+
+═══════════════════════════════════════
+STACK TECHNIQUE
+═══════════════════════════════════════
+- Backend : Flask (Python)
+- Frontend : HTML/CSS/JavaScript vanilla (pas de framework JS, pas de build Node)
+- Base de données : SQLite (via SQLAlchemy)
+- Authentification : login + mot de passe (hash avec werkzeug.security)
+- Structure compatible PythonAnywhere : app.py comme point d'entrée WSGI
+
+═══════════════════════════════════════
+RÔLES ET AUTHENTIFICATION
+═══════════════════════════════════════
+- Deux rôles : "agent" et "admin"
+- Page de connexion unique (/login) avec email + mot de passe
+- Redirection selon le rôle après connexion
+- Protection des routes par rôle avec décorateurs (@login_required, @admin_required)
+- Vérification du rôle côté serveur sur CHAQUE route sensible : un accès direct à une 
+  URL admin par un agent doit renvoyer une erreur 403, pas juste cacher le lien côté HTML
+- Mot de passe jamais stocké en clair (werkzeug.security.generate_password_hash)
+- Déconnexion (/logout)
+
+═══════════════════════════════════════
+FONCTIONNALITÉS AGENT (rôle limité à la vente)
+═══════════════════════════════════════
+1. Consultation du stock (lecture seule)
+   - Liste des produits avec quantité disponible, prix, catégorie
+   - Recherche/filtre par nom ou catégorie
+   - Alerte visuelle si stock bas (ex : < 5 unités)
+   - Aucune action d'ajout, modification ou suppression possible
+
+2. Enregistrer une vente (caisse)
+   - Sélection de produit(s) + quantité
+   - Calcul automatique du total (sous-total, promo éventuelle, total final)
+   - Décrémentation automatique du stock à la validation
+   - Génération automatique d'un reçu après validation
+
+3. Historique de ses ventes
+   - Liste des ventes effectuées par l'agent connecté uniquement
+   - Filtre par période (jour/semaine/mois)
+   - Accès au détail/reçu de chaque vente passée
+
+4. Profil personnel
+   - Upload/modification de sa propre photo de profil (jpg/png)
+
+═══════════════════════════════════════
+FONCTIONNALITÉS ADMIN (accès complet)
+═══════════════════════════════════════
+1. Gestion complète des produits
+   - Ajouter / modifier / supprimer un produit (confirmation avant suppression)
+
+2. Gestion des agents
+   - Créer / modifier / désactiver / supprimer un compte agent
+   - Définir ou modifier la photo de profil de chaque agent
+   - Liste de tous les agents avec photo, statut, dernière connexion
+
+3. Statistiques globales de vente (dashboard)
+   - Chiffre d'affaires total (jour/semaine/mois/année), sélecteur de période
+   - Ventes par agent (comparatif, classement avec photo + nom)
+   - Produits les plus vendus (top 5)
+   - Graphique d'évolution des ventes (courbe, Chart.js en CDN)
+   - Répartition des ventes par catégorie (camembert)
+   - Alertes stock bas visibles directement sur le dashboard
+
+4. Gestion des prix et promotions
+   - Modifier le prix d'un produit
+   - Créer une promotion (% de réduction, date début/fin) sur produit ou catégorie
+   - Voir les promotions actives/expirées
+
+5. Configuration du magasin
+   - Modifier le nom du magasin (affiché en en-tête, dashboard, reçus)
+   - Uploader/changer un logo (optionnel)
+
+6. Gestion de la devise
+   - Choix de la devise active : Dollar ($) ou Franc Congolais (FC)
+   - Taux de change configurable (défaut : 1 $ = 2800 FC)
+   - FC affiché sans décimales (ex : 25 000 FC), $ avec 2 décimales (ex : $12.50)
+   - L'historique des ventes conserve la devise et le taux utilisés au moment de 
+     chaque vente (jamais recalculé rétroactivement)
+
+7. Journal d'audit
+   - Enregistrement automatique de toutes les actions sensibles : connexions, 
+     création/modification/suppression de produits, gestion des agents, changements 
+     de prix/promotions, changement de devise/taux, changement du nom du magasin
+   - Chaque entrée : date/heure, utilisateur, action, détail (ancienne → nouvelle valeur)
+   - Page /audit avec filtre par utilisateur, type d'action, période
+   - Journal non modifiable et non supprimable, même par l'admin
+
+═══════════════════════════════════════
+STRUCTURE DES PAGES
+═══════════════════════════════════════
+- /login : connexion
+- /dashboard : tableau de bord (vue agent simple / vue admin complète)
+- /profil : gestion de sa propre photo de profil
+- /stock : consultation (agent) / gestion complète (admin)
+- /produit/nouveau et /produit/<id>/modifier : formulaires produit (admin uniquement)
+- /caisse : enregistrement d'une vente
+- /vente/<id>/recu : reçu avec impression automatique
+- /historique : historique des ventes (agent = les siennes, admin = toutes)
+- /agents (admin) : gestion des comptes agents
+- /statistiques (admin) : stats et graphiques détaillés
+- /promotions (admin) : gestion des promotions
+- /parametres (admin) : nom du magasin, logo, devise, taux de change
+- /audit (admin) : journal d'audit complet
+
+═══════════════════════════════════════
+BASE DE DONNÉES (modèles SQLAlchemy)
+═══════════════════════════════════════
+- User (id, nom, email, mot_de_passe_hash, role, actif, photo_profil, derniere_connexion)
+- Produit (id, nom, categorie, prix, stock, description, image)
+- Vente (id, agent_id, date, total, devise, taux_change_utilise, numero_recu)
+- LigneVente (id, vente_id, produit_id, nom_produit, quantite, prix_unitaire, sous_total)
+- Promotion (id, produit_id ou categorie, pourcentage, date_debut, date_fin)
+- Parametres (id, nom_magasin, logo, devise_active, taux_change_usd_fc)
+- AuditLog (id, user_id, action, detail, ancienne_valeur, nouvelle_valeur, date_heure)
+
+Index à créer : User.email, Vente.date, Vente.agent_id, Produit.categorie
+
+═══════════════════════════════════════
+REÇU DE VENTE
+═══════════════════════════════════════
+- En-tête : nom du magasin (configurable), sous-titre "Reçu de vente"
+- Corps : numéro de reçu unique, date/heure, nom + photo de l'agent
+- Tableau des articles : nom, quantité, total par ligne
+- Pied : sous-total, promotion si applicable, total final dans la devise active
+- Impression automatique au chargement de /vente/<id>/recu (window.onload → window.print())
+- Bouton "Imprimer" toujours visible pour réimpression manuelle depuis l'historique
+- Design type ticket de caisse : largeur étroite, bordures pointillées entre sections
+
+═══════════════════════════════════════
+DASHBOARD
+═══════════════════════════════════════
+Vue AGENT :
+- Carte de bienvenue avec photo + nom
+- Résumé rapide : ventes du jour, montant du jour
+- Accès direct au bouton "Nouvelle vente"
+
+Vue ADMIN :
+- Cartes indicateurs en haut : CA du jour, nombre de ventes, produits en stock bas, 
+  agents actifs — chargées via un seul appel groupé
+- Graphique d'évolution des ventes (7 derniers jours, extensible)
+- Liste "Top agents" avec photo + nom + montant vendu
+- Liste des produits en stock critique, avec lien direct vers la fiche
+- Widgets chargés en asynchrone (fetch/AJAX) pour ne jamais bloquer l'affichage initial
+
+═══════════════════════════════════════
+PERFORMANCE ET STABILITÉ
+═══════════════════════════════════════
+- Aucune librairie JS lourde : uniquement Chart.js (CDN) et vanilla JS
+- Index SQL sur les colonnes filtrées fréquemment (email, date, agent_id, categorie)
+- Pagination obligatoire sur toutes les listes longues (20 éléments/page) — jamais tout 
+  charger d'un coup
+- Chaque route encapsulée en try/except avec rollback automatique de la session 
+  SQLAlchemy en cas d'erreur
+- Pages d'erreur personnalisées (404, 403, 500) au lieu de tracebacks bruts
+- Compression/redimensionnement automatique des images uploadées (photos de profil, 
+  logo) — max 300x300px
+- Pool de connexions SQLAlchemy pour éviter les ralentissements sous charge
+
+═══════════════════════════════════════
+DESIGN
+═══════════════════════════════════════
+- Interface sobre, professionnelle, orientée productivité (pas de style "boutique 
+  en ligne" — c'est un outil de travail interne)
+- Palette de couleurs distincte et cohérente, propre à ce magasin (éviter le bleu 
+  générique de dashboard et le violet/dégradé par défaut)
+- Typographie lisible, hiérarchie claire entre titres, labels et données chiffrées
+- Tableaux triables et responsive (utilisables sur tablette/mobile)
+- Messages de confirmation/erreur clairs en français (ex : "Stock insuffisant", 
+  "Vente enregistrée", "Produit supprimé")
+- Navigation en sidebar affichant le nom et logo du magasin configurés, ainsi que la 
+  photo de profil de l'utilisateur connecté
+
+═══════════════════════════════════════
+STRUCTURE DE FICHIERS
+═══════════════════════════════════════
+/app.py
+/models.py
+/templates/ (fichiers .html avec Jinja2)
+/static/css/
+/static/js/
+/static/uploads/ (logo du magasin et photos de profil)
+/database.db (SQLite, généré au premier lancement)
+
+═══════════════════════════════════════
+INITIALISATION
+═══════════════════════════════════════
+Code propre, commenté, prêt à déployer tel quel sur PythonAnywhere.
+requirements.txt minimal : Flask, Flask-SQLAlchemy, Werkzeug, Pillow (pour le 
+redimensionnement d'images).
+
+Inclure un script init_db.py qui crée :
+- Les tables de la base de données
+- Un compte admin par défaut (email: admin@magasin.com / mot de passe: admin123, 
+  à changer après la première connexion)
+- Des paramètres par défaut : nom du magasin "Mon Magasin", devise FC, 
+  taux 1$ = 2800 FC (ajustable depuis /parametres)
