@@ -1,0 +1,3 @@
+- [Flask Store stack](flask-store-stack.md) — app Flask+SQLite dans flask-store/, PythonAnywhere-ready, deux rôles admin/agent.
+- [Flask Store CSRF](flask-store-csrf.md) — Flask-WTF CSRF activé globalement ; endpoint /caisse POST exempté manuellement avec validate_csrf() sur X-CSRFToken header.
+- [Flask Store Parametres migration](flask-store-migration.md) — nouvelles colonnes Parametres ajoutées via ALTER TABLE dans init_db.py (SQLite ne supporte pas la migration automatique).

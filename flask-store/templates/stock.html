@@ -4,7 +4,10 @@
 
 {% block topbar_actions %}
   {% if session.get('role') == 'admin' %}
-  <a href="{{ url_for('produit_nouveau') }}" class="btn btn-accent">+ Ajouter un produit</a>
+  <a href="{{ url_for('produit_nouveau') }}" class="btn btn-accent">
+    <svg viewBox="0 0 24 24" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Ajouter un produit
+  </a>
   {% endif %}
 {% endblock %}
 
@@ -12,8 +15,9 @@
 <div class="card">
   <div class="card-header filter-bar">
     <form method="GET" class="filter-form">
-      <input type="text" name="q" value="{{ search }}" placeholder="Rechercher un produit…" class="input-search">
-      <select name="categorie" class="select-input">
+      <input type="text" name="q" value="{{ search }}" placeholder="Rechercher un produit…"
+             class="input-search" autocomplete="off">
+      <select name="categorie" class="select-input" onchange="this.form.submit()">
         <option value="">Toutes les catégories</option>
         {% for cat in categories %}
         <option value="{{ cat }}" {% if cat == categorie_filtre %}selected{% endif %}>{{ cat }}</option>
@@ -61,7 +65,7 @@
             {% if p.stock == 0 %}
               <span class="stock-badge stock-zero">Rupture</span>
             {% elif p.stock < STOCK_BAS_SEUIL %}
-              <span class="stock-badge stock-low">{{ p.stock }} unités ⚠</span>
+              <span class="stock-badge stock-low">{{ p.stock }} ⚠</span>
             {% else %}
               <span class="stock-badge stock-ok">{{ p.stock }}</span>
             {% endif %}
@@ -69,9 +73,10 @@
           {% if session.get('role') == 'admin' %}
           <td>
             <div class="action-btns">
-              <a href="{{ url_for('produit_modifier', id=p.id) }}" class="btn btn-sm btn-outline" title="Modifier">Modifier</a>
+              <a href="{{ url_for('produit_modifier', id=p.id) }}" class="btn btn-sm btn-outline">Modifier</a>
               <form method="POST" action="{{ url_for('produit_supprimer', id=p.id) }}"
                     onsubmit="return confirm('Supprimer « {{ p.nom }} » ? Cette action est irréversible.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
               </form>
             </div>
@@ -79,7 +84,23 @@
           {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="5" class="empty-row">Aucun produit trouvé.</td></tr>
+        <tr>
+          <td colspan="5">
+            <div class="empty-state-full">
+              {% if search or categorie_filtre %}
+                <svg viewBox="0 0 24 24" width="40" height="40"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <p>Aucun produit ne correspond à votre recherche.</p>
+                <a href="{{ url_for('stock') }}" class="btn btn-sm btn-ghost">Voir tous les produits</a>
+              {% else %}
+                <svg viewBox="0 0 24 24" width="40" height="40"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                <p>Votre catalogue est vide.</p>
+                {% if session.get('role') == 'admin' %}
+                <a href="{{ url_for('produit_nouveau') }}" class="btn btn-sm btn-accent">+ Ajouter le premier produit</a>
+                {% endif %}
+              {% endif %}
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -90,7 +111,7 @@
     {% if produits.has_prev %}
       <a href="{{ url_for('stock', page=produits.prev_num, q=search, categorie=categorie_filtre) }}" class="page-btn">‹ Préc.</a>
     {% endif %}
-    <span class="page-info">Page {{ produits.page }} / {{ produits.pages }}</span>
+    <span class="page-info">Page {{ produits.page }} / {{ produits.pages }} — {{ produits.total }} produit(s)</span>
     {% if produits.has_next %}
       <a href="{{ url_for('stock', page=produits.next_num, q=search, categorie=categorie_filtre) }}" class="page-btn">Suiv. ›</a>
     {% endif %}

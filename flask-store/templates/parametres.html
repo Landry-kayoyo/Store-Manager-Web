@@ -5,28 +5,77 @@
 {% block content %}
 <div class="card form-card">
   <form method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {# ── Identité ───────────────────────────────────────── #}
     <h3 class="section-title">Identité du magasin</h3>
     <div class="form-grid">
       <div class="form-group form-group-full">
-        <label for="nom_magasin">Nom du magasin</label>
+        <label for="nom_magasin">Nom du magasin <span class="required">*</span></label>
         <input type="text" id="nom_magasin" name="nom_magasin"
-               value="{{ params.nom_magasin }}" required placeholder="Mon Magasin">
+               value="{{ params.nom_magasin }}" required maxlength="200"
+               placeholder="Mon Magasin">
         <p class="form-hint">Affiché dans l'en-tête, le dashboard et les reçus.</p>
       </div>
 
       <div class="form-group form-group-full">
-        <label for="logo">Logo du magasin</label>
-        {% if params.logo %}
-          <div class="current-image">
-            <img src="{{ url_for('uploaded_file', filename=params.logo) }}" alt="Logo actuel" class="preview-img" style="max-width:120px">
-            <p class="text-muted">Logo actuel — choisissez un nouveau fichier pour le remplacer.</p>
+        <label>Logo du magasin</label>
+        <div class="logo-upload-row">
+          <div class="logo-preview-box" id="logo-preview-box">
+            {% if params.logo %}
+              <img src="{{ url_for('uploaded_file', filename=params.logo) }}"
+                   alt="Logo actuel" id="logo-preview-img">
+            {% else %}
+              <div class="logo-preview-placeholder" id="logo-placeholder">
+                <svg viewBox="0 0 24 24" width="32" height="32"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>Aucun logo</span>
+              </div>
+            {% endif %}
           </div>
-        {% endif %}
-        <input type="file" id="logo" name="logo" accept=".jpg,.jpeg,.png,.webp">
-        <p class="form-hint">PNG ou JPG recommandé — max 300×300 px après redimensionnement.</p>
+          <div class="logo-upload-info">
+            <label for="logo" class="btn btn-outline btn-sm" style="cursor:pointer">
+              Choisir une image
+            </label>
+            <input type="file" id="logo" name="logo" accept=".jpg,.jpeg,.png,.webp"
+                   class="visually-hidden" onchange="previewLogo(this)">
+            <p class="form-hint">PNG, JPG ou WEBP — max 5 Mo.<br>
+               Enregistré à max 600×300 px. Les logos rectangulaires (bannière) s'affichent mieux.</p>
+            {% if params.logo %}
+            <p class="text-muted" style="font-size:.78rem">Choisissez un nouveau fichier pour remplacer le logo actuel.</p>
+            {% endif %}
+          </div>
+        </div>
       </div>
     </div>
 
+    {# ── Contact / Reçu ─────────────────────────────────── #}
+    <h3 class="section-title">Informations de contact <span class="badge-hint">affichées sur les reçus</span></h3>
+    <div class="form-grid">
+      <div class="form-group form-group-full">
+        <label for="adresse">Adresse</label>
+        <textarea id="adresse" name="adresse" rows="2" maxlength="300"
+                  placeholder="Ex : Avenue du Commerce, Kinshasa">{{ params.adresse or '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label for="telephone">Téléphone</label>
+        <input type="text" id="telephone" name="telephone" maxlength="50"
+               value="{{ params.telephone or '' }}" placeholder="+243 81 234 5678">
+      </div>
+      <div class="form-group">
+        <label for="site_web">Site web / Email</label>
+        <input type="text" id="site_web" name="site_web" maxlength="200"
+               value="{{ params.site_web or '' }}" placeholder="www.monmagasin.com">
+      </div>
+      <div class="form-group form-group-full">
+        <label for="message_recu">Message de bas de reçu</label>
+        <input type="text" id="message_recu" name="message_recu" maxlength="300"
+               value="{{ params.message_recu or 'Merci pour votre achat !' }}"
+               placeholder="Merci pour votre achat !">
+        <p class="form-hint">Phrase affichée en bas de chaque reçu de vente.</p>
+      </div>
+    </div>
+
+    {# ── Devise ─────────────────────────────────────────── #}
     <h3 class="section-title">Devise et taux de change</h3>
     <div class="form-grid">
       <div class="form-group">
@@ -36,13 +85,35 @@
           <option value="USD" {% if params.devise_active == 'USD' %}selected{% endif %}>Dollar américain ($)</option>
         </select>
       </div>
-
       <div class="form-group">
         <label for="taux_change">Taux de change (1 $ = ? FC)</label>
         <input type="number" id="taux_change" name="taux_change"
                value="{{ params.taux_change_usd_fc | int }}" min="1" step="1"
                placeholder="2800">
-        <p class="form-hint">Utilisé comme référence. L'historique garde le taux au moment de chaque vente.</p>
+        <p class="form-hint">L'historique garde le taux au moment de chaque vente.</p>
+      </div>
+    </div>
+
+    {# ── Seuils opérationnels ───────────────────────────── #}
+    <h3 class="section-title">Paramètres opérationnels</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="seuil_stock_bas">Alerte stock bas (en dessous de)</label>
+        <div class="input-with-suffix">
+          <input type="number" id="seuil_stock_bas" name="seuil_stock_bas"
+                 value="{{ params.seuil_stock_bas or 5 }}" min="1" max="999" step="1">
+          <span class="input-suffix">unités</span>
+        </div>
+        <p class="form-hint">Les produits sous ce seuil apparaissent en alerte rouge.</p>
+      </div>
+      <div class="form-group">
+        <label for="pagination">Lignes par page (tableaux)</label>
+        <div class="input-with-suffix">
+          <input type="number" id="pagination" name="pagination"
+                 value="{{ params.pagination or 20 }}" min="5" max="100" step="5">
+          <span class="input-suffix">lignes</span>
+        </div>
+        <p class="form-hint">Entre 5 et 100 lignes par page.</p>
       </div>
     </div>
 
@@ -53,7 +124,22 @@
 
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Enregistrer les paramètres</button>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">Annuler</a>
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function previewLogo(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const box = document.getElementById('logo-preview-box');
+    box.innerHTML = `<img src="${e.target.result}" alt="Aperçu" id="logo-preview-img">`;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+</script>
 {% endblock %}

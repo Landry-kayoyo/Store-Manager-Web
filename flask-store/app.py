@@ -3,16 +3,23 @@ Application Flask — Gestion de magasin interne.
 Point d'entrée WSGI compatible PythonAnywhere.
 """
 import os
+import io
+import csv
 import json
+import logging
 from datetime import datetime, date, timedelta
 from functools import wraps
 
 from flask import (Flask, render_template, request, redirect, url_for,
-                   session, flash, jsonify, abort, send_from_directory)
+                   session, flash, jsonify, abort, send_from_directory,
+                   Response)
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy import func, extract
+from sqlalchemy import func
 
 # ──────────────────────────────────────────────────────────
 # Configuration
@@ -20,15 +27,40 @@ from sqlalchemy import func, extract
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-me-in-production-please')
+
+# Clé secrète — TOUJOURS définir SECRET_KEY en production
+_secret = os.environ.get('SECRET_KEY', '')
+if not _secret:
+    _secret = 'dev-fallback-key-CHANGE-IN-PRODUCTION'
+    logging.warning("⚠️  SECRET_KEY non définie ! Utilisez la variable d'environnement SECRET_KEY en production.")
+app.config['SECRET_KEY'] = _secret
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB max
+
+# ── Sécurité des cookies de session ──────────────────────
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# Activer Secure uniquement si SECRET_KEY fournie (= production)
+if os.environ.get('SECRET_KEY'):
+    app.config['SESSION_COOKIE_SECURE'] = True
+
+# ── CSRF (Flask-WTF) ─────────────────────────────────────
+app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 heure
+csrf = CSRFProtect(app)
+
+# ── Rate Limiter ─────────────────────────────────────────
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
-STOCK_BAS_SEUIL = 5
-PAGINATION = 20
 
 from models import db, User, Produit, Vente, LigneVente, Promotion, Parametres, AuditLog
 db.init_app(app)
@@ -88,19 +120,32 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def save_image(file, prefix='img'):
-    """Redimensionne et sauvegarde une image. Retourne le nom de fichier."""
-    from PIL import Image
+def save_image(file, prefix='img', max_size=(300, 300)):
+    """Vérifie, redimensionne et sauvegarde une image. Retourne le nom de fichier."""
+    from PIL import Image, UnidentifiedImageError
     import uuid
     if not file or not allowed_file(file.filename):
         return None
-    ext = secure_filename(file.filename).rsplit('.', 1)[1].lower()
-    filename = f"{prefix}_{uuid.uuid4().hex[:8]}.{ext}"
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    img = Image.open(file)
-    img.thumbnail((300, 300), Image.LANCZOS)
-    img.save(filepath)
-    return filename
+    # Vérification MIME réelle via Pillow (pas juste l'extension)
+    file.seek(0)
+    try:
+        probe = Image.open(file)
+        probe.verify()   # lève une exception si le fichier n'est pas une image valide
+    except (UnidentifiedImageError, Exception):
+        return None
+    file.seek(0)
+    try:
+        img = Image.open(file)
+        img = img.convert('RGB') if img.mode not in ('RGB', 'RGBA') else img
+        img.thumbnail(max_size, Image.LANCZOS)
+        ext = 'jpg' if img.mode == 'RGB' else 'png'
+        filename = f"{prefix}_{uuid.uuid4().hex[:10]}.{ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        img.save(filepath, quality=88, optimize=True)
+        return filename
+    except Exception as exc:
+        app.logger.warning(f"save_image error: {exc}")
+        return None
 
 
 def delete_image(filename):
@@ -140,17 +185,19 @@ def get_active_promos(produit_id, categorie):
 def log_audit(action, detail=None, ancienne_valeur=None, nouvelle_valeur=None):
     """Enregistre une entrée dans le journal d'audit."""
     try:
+        ip = request.remote_addr if request else None
         entry = AuditLog(
             user_id=session.get('user_id'),
             action=action,
             detail=detail,
             ancienne_valeur=str(ancienne_valeur) if ancienne_valeur is not None else None,
             nouvelle_valeur=str(nouvelle_valeur) if nouvelle_valeur is not None else None,
+            ip_address=ip,
         )
         db.session.add(entry)
         db.session.flush()
-    except Exception:
-        pass  # Ne jamais bloquer sur l'audit
+    except Exception as exc:
+        app.logger.warning(f"log_audit failed for action={action}: {exc}")
 
 
 def current_user():
@@ -165,17 +212,26 @@ def current_user():
 @app.context_processor
 def inject_globals():
     params = None
+    seuil = 5
     try:
         params = get_params()
+        seuil = params.seuil_stock_bas or 5
     except Exception:
         pass
     return {
         'params': params,
         'current_user': current_user(),
         'format_montant': format_montant,
-        'STOCK_BAS_SEUIL': STOCK_BAS_SEUIL,
+        'STOCK_BAS_SEUIL': seuil,
         'now': datetime.utcnow(),
     }
+
+
+# Exposer le token CSRF aux templates JS via balise meta
+@app.after_request
+def set_csrf_cookie(response):
+    # Inclure le token dans les réponses HTML pour permettre aux fetch() JS de l'utiliser
+    return response
 
 
 # ──────────────────────────────────────────────────────────
@@ -189,6 +245,7 @@ def index():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute", methods=["POST"])
 def login():
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
@@ -203,13 +260,19 @@ def login():
                 session['role'] = user.role
                 session['nom'] = user.nom
                 user.derniere_connexion = datetime.utcnow()
-                log_audit('CONNEXION', f"Connexion de {user.email}")
+                log_audit('CONNEXION', f"Connexion réussie : {user.email}")
                 db.session.commit()
                 flash(f'Bienvenue, {user.nom} !', 'success')
                 return redirect(url_for('dashboard'))
             else:
+                # Journaliser la tentative échouée
+                log_audit('CONNEXION_ECHEC', f"Tentative échouée pour : {email}")
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
                 flash('Email ou mot de passe incorrect, ou compte désactivé.', 'danger')
-        except Exception as e:
+        except Exception:
             db.session.rollback()
             flash('Erreur lors de la connexion.', 'danger')
     return render_template('login.html')
@@ -239,7 +302,6 @@ def dashboard():
     if session['role'] == 'admin':
         return render_template('dashboard.html', user=user, params=params)
     else:
-        # Vue agent : résumé du jour
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         ventes_jour = Vente.query.filter(
             Vente.agent_id == user.id,
@@ -264,19 +326,17 @@ def profil():
         try:
             file = request.files.get('photo')
             if file and file.filename:
-                if not allowed_file(file.filename):
-                    flash('Format non autorisé. Utilisez JPG ou PNG.', 'danger')
-                    return redirect(url_for('profil'))
                 old_photo = user.photo_profil
-                filename = save_image(file, prefix='profil')
+                filename = save_image(file, prefix='profil', max_size=(300, 300))
                 if filename:
                     user.photo_profil = filename
                     if old_photo:
                         delete_image(old_photo)
-                    db.session.commit()
                     log_audit('MODIF_PROFIL', f"Changement de photo de profil de {user.nom}")
                     db.session.commit()
                     flash('Photo de profil mise à jour.', 'success')
+                else:
+                    flash('Image invalide ou format non autorisé (JPG, PNG, WEBP).', 'danger')
             else:
                 flash('Aucun fichier sélectionné.', 'warning')
         except Exception:
@@ -291,6 +351,7 @@ def profil():
 @app.route('/stock')
 @login_required
 def stock():
+    params = get_params()
     page = request.args.get('page', 1, type=int)
     search = request.args.get('q', '').strip()
     categorie = request.args.get('categorie', '').strip()
@@ -302,7 +363,7 @@ def stock():
         query = query.filter(Produit.categorie == categorie)
     query = query.order_by(Produit.nom)
 
-    produits = query.paginate(page=page, per_page=PAGINATION, error_out=False)
+    produits = query.paginate(page=page, per_page=params.pagination or 20, error_out=False)
     categories = db.session.query(Produit.categorie).distinct().order_by(Produit.categorie).all()
     categories = [c[0] for c in categories]
     return render_template('stock.html', produits=produits, categories=categories,
@@ -316,11 +377,21 @@ def produit_nouveau():
         try:
             nom = request.form.get('nom', '').strip()
             categorie = request.form.get('categorie', '').strip()
-            prix = float(request.form.get('prix', 0))
-            stock_qty = int(request.form.get('stock', 0))
+            prix_str = request.form.get('prix', '0').strip()
+            stock_str = request.form.get('stock', '0').strip()
             description = request.form.get('description', '').strip()
+
+            if not nom or not categorie:
+                flash('Le nom et la catégorie sont obligatoires.', 'danger')
+                return redirect(request.url)
+            prix = float(prix_str)
+            stock_qty = int(stock_str)
+            if prix < 0 or stock_qty < 0:
+                flash('Le prix et le stock ne peuvent pas être négatifs.', 'danger')
+                return redirect(request.url)
+
             file = request.files.get('image')
-            image_filename = save_image(file, prefix='prod') if file and file.filename else None
+            image_filename = save_image(file, prefix='prod', max_size=(400, 400)) if file and file.filename else None
 
             p = Produit(nom=nom, categorie=categorie, prix=prix,
                         stock=stock_qty, description=description, image=image_filename)
@@ -333,10 +404,10 @@ def produit_nouveau():
             return redirect(url_for('stock'))
         except ValueError:
             db.session.rollback()
-            flash('Valeurs numériques invalides.', 'danger')
+            flash('Valeurs numériques invalides (prix ou stock).', 'danger')
         except Exception as e:
             db.session.rollback()
-            flash('Erreur lors de l\'ajout du produit.', 'danger')
+            flash("Erreur lors de l'ajout du produit.", 'danger')
     categories = db.session.query(Produit.categorie).distinct().order_by(Produit.categorie).all()
     categories = [c[0] for c in categories]
     return render_template('produit_form.html', produit=None, categories=categories)
@@ -349,22 +420,27 @@ def produit_modifier(id):
     if request.method == 'POST':
         try:
             old_vals = f"nom={produit.nom}, prix={produit.prix}, stock={produit.stock}"
-            produit.nom = request.form.get('nom', produit.nom).strip()
-            produit.categorie = request.form.get('categorie', produit.categorie).strip()
-            produit.prix = float(request.form.get('prix', produit.prix))
-            produit.stock = int(request.form.get('stock', produit.stock))
+            nom = request.form.get('nom', produit.nom).strip()
+            cat = request.form.get('categorie', produit.categorie).strip()
+            prix = float(request.form.get('prix', produit.prix))
+            stock_qty = int(request.form.get('stock', produit.stock))
+            if prix < 0 or stock_qty < 0:
+                flash('Le prix et le stock ne peuvent pas être négatifs.', 'danger')
+                return redirect(request.url)
+            produit.nom = nom
+            produit.categorie = cat
+            produit.prix = prix
+            produit.stock = stock_qty
             produit.description = request.form.get('description', produit.description or '').strip()
             file = request.files.get('image')
             if file and file.filename:
-                if allowed_file(file.filename):
-                    old_img = produit.image
-                    new_img = save_image(file, prefix='prod')
-                    if new_img:
-                        produit.image = new_img
-                        if old_img:
-                            delete_image(old_img)
+                new_img = save_image(file, prefix='prod', max_size=(400, 400))
+                if new_img:
+                    if produit.image:
+                        delete_image(produit.image)
+                    produit.image = new_img
                 else:
-                    flash('Format image non autorisé.', 'warning')
+                    flash('Image invalide ou format non autorisé — image non modifiée.', 'warning')
             new_vals = f"nom={produit.nom}, prix={produit.prix}, stock={produit.stock}"
             log_audit('MODIF_PRODUIT', f"Produit modifié : {produit.nom}",
                       ancienne_valeur=old_vals, nouvelle_valeur=new_vals)
@@ -390,7 +466,6 @@ def produit_supprimer(id):
         nom = produit.nom
         if produit.image:
             delete_image(produit.image)
-        # Mettre à null les références dans LigneVente
         LigneVente.query.filter_by(produit_id=id).update({'produit_id': None})
         Promotion.query.filter_by(produit_id=id).delete()
         db.session.delete(produit)
@@ -409,9 +484,7 @@ def produit_supprimer(id):
 @app.route('/caisse')
 @login_required
 def caisse():
-    produits = Produit.query.filter(Produit.stock > 0).order_by(Produit.categorie, Produit.nom).all()
-    today = date.today()
-    # Calculer les promos actives
+    produits = Produit.query.order_by(Produit.categorie, Produit.nom).all()
     promos_data = []
     for p in produits:
         pct = get_active_promos(p.id, p.categorie)
@@ -430,7 +503,16 @@ def caisse():
 
 @app.route('/caisse', methods=['POST'])
 @login_required
+@csrf.exempt   # JSON fetch — le token est passé via l'en-tête X-CSRFToken par caisse.js
 def caisse_valider():
+    # Vérification manuelle du token CSRF
+    token = request.headers.get('X-CSRFToken', '')
+    from flask_wtf.csrf import validate_csrf
+    try:
+        validate_csrf(token)
+    except Exception:
+        return jsonify({'error': 'Token CSRF invalide. Rechargez la page.'}), 400
+
     try:
         data = request.get_json()
         if not data or not data.get('lignes'):
@@ -493,7 +575,6 @@ def caisse_valider():
 @login_required
 def recu(id):
     vente = Vente.query.get_or_404(id)
-    # Agent ne voit que ses propres reçus
     if session['role'] != 'admin' and vente.agent_id != session['user_id']:
         abort(403)
     lignes = vente.lignes.all()
@@ -515,6 +596,7 @@ def recu(id):
 @app.route('/historique')
 @login_required
 def historique():
+    params = get_params()
     page = request.args.get('page', 1, type=int)
     periode = request.args.get('periode', 'mois')
     agent_id_filtre = request.args.get('agent_id', type=int)
@@ -525,7 +607,7 @@ def historique():
     elif periode == 'semaine':
         debut = now - timedelta(days=now.weekday())
         debut = debut.replace(hour=0, minute=0, second=0, microsecond=0)
-    else:  # mois
+    else:
         debut = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     query = Vente.query.filter(Vente.date >= debut)
@@ -538,7 +620,7 @@ def historique():
         agents = []
 
     ventes = query.order_by(Vente.date.desc()).paginate(
-        page=page, per_page=PAGINATION, error_out=False)
+        page=page, per_page=params.pagination or 20, error_out=False)
     return render_template('historique.html', ventes=ventes, periode=periode,
                            agents=agents, agent_id_filtre=agent_id_filtre)
 
@@ -549,10 +631,11 @@ def historique():
 @app.route('/agents')
 @admin_required
 def agents():
+    params = get_params()
     page = request.args.get('page', 1, type=int)
-    agents = User.query.filter_by(role='agent').order_by(User.nom)\
-        .paginate(page=page, per_page=PAGINATION, error_out=False)
-    return render_template('agents.html', agents=agents)
+    agents_pag = User.query.filter_by(role='agent').order_by(User.nom)\
+        .paginate(page=page, per_page=params.pagination or 20, error_out=False)
+    return render_template('agents.html', agents=agents_pag)
 
 
 @app.route('/agents/nouveau', methods=['GET', 'POST'])
@@ -566,11 +649,14 @@ def agent_nouveau():
             if not nom or not email or not mdp:
                 flash('Tous les champs obligatoires doivent être remplis.', 'danger')
                 return render_template('agent_form.html', agent=None)
+            if len(mdp) < 6:
+                flash('Le mot de passe doit contenir au moins 6 caractères.', 'danger')
+                return render_template('agent_form.html', agent=None)
             if User.query.filter_by(email=email).first():
                 flash('Cet email est déjà utilisé.', 'danger')
                 return render_template('agent_form.html', agent=None)
             file = request.files.get('photo')
-            photo = save_image(file, prefix='agent') if file and file.filename else None
+            photo = save_image(file, prefix='agent', max_size=(300, 300)) if file and file.filename else None
             user = User(nom=nom, email=email,
                         mot_de_passe_hash=generate_password_hash(mdp),
                         role='agent', actif=True, photo_profil=photo)
@@ -583,7 +669,7 @@ def agent_nouveau():
             return redirect(url_for('agents'))
         except Exception:
             db.session.rollback()
-            flash('Erreur lors de la création de l\'agent.', 'danger')
+            flash("Erreur lors de la création de l'agent.", 'danger')
     return render_template('agent_form.html', agent=None)
 
 
@@ -595,20 +681,27 @@ def agent_modifier(id):
         try:
             old_vals = f"nom={agent.nom}, email={agent.email}, actif={agent.actif}"
             agent.nom = request.form.get('nom', agent.nom).strip()
-            agent.email = request.form.get('email', agent.email).strip().lower()
+            new_email = request.form.get('email', agent.email).strip().lower()
+            # Vérifier unicité si l'email change
+            if new_email != agent.email and User.query.filter_by(email=new_email).first():
+                flash('Cet email est déjà utilisé par un autre compte.', 'danger')
+                return render_template('agent_form.html', agent=agent)
+            agent.email = new_email
             agent.actif = request.form.get('actif') == 'on'
             mdp = request.form.get('mot_de_passe', '').strip()
             if mdp:
+                if len(mdp) < 6:
+                    flash('Le mot de passe doit contenir au moins 6 caractères.', 'danger')
+                    return render_template('agent_form.html', agent=agent)
                 agent.mot_de_passe_hash = generate_password_hash(mdp)
+                log_audit('MODIF_MDP_AGENT', f"Mot de passe modifié pour : {agent.email}")
             file = request.files.get('photo')
             if file and file.filename:
-                if allowed_file(file.filename):
-                    old_photo = agent.photo_profil
-                    new_photo = save_image(file, prefix='agent')
-                    if new_photo:
-                        agent.photo_profil = new_photo
-                        if old_photo:
-                            delete_image(old_photo)
+                new_photo = save_image(file, prefix='agent', max_size=(300, 300))
+                if new_photo:
+                    if agent.photo_profil:
+                        delete_image(agent.photo_profil)
+                    agent.photo_profil = new_photo
             new_vals = f"nom={agent.nom}, email={agent.email}, actif={agent.actif}"
             log_audit('MODIF_AGENT', f"Compte agent modifié : {agent.email}",
                       ancienne_valeur=old_vals, nouvelle_valeur=new_vals)
@@ -617,7 +710,7 @@ def agent_modifier(id):
             return redirect(url_for('agents'))
         except Exception:
             db.session.rollback()
-            flash('Erreur lors de la mise à jour de l\'agent.', 'danger')
+            flash("Erreur lors de la mise à jour de l'agent.", 'danger')
     return render_template('agent_form.html', agent=agent)
 
 
@@ -630,7 +723,6 @@ def agent_supprimer(id):
         email = agent.email
         if agent.photo_profil:
             delete_image(agent.photo_profil)
-        # Dissocier les ventes (ne pas supprimer l'historique)
         Vente.query.filter_by(agent_id=id).update({'agent_id': session['user_id']})
         log_audit('SUPPR_AGENT', f"Compte agent supprimé : {email}",
                   ancienne_valeur=f"nom={nom}, email={email}")
@@ -639,7 +731,7 @@ def agent_supprimer(id):
         flash(f'Agent "{nom}" supprimé.', 'success')
     except Exception:
         db.session.rollback()
-        flash('Erreur lors de la suppression de l\'agent.', 'danger')
+        flash('Erreur lors de la suppression.', 'danger')
     return redirect(url_for('agents'))
 
 
@@ -656,18 +748,18 @@ def statistiques():
 @admin_required
 def api_dashboard_stats():
     try:
+        params = get_params()
+        seuil = params.seuil_stock_bas or 5
         now = datetime.utcnow()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # KPIs du jour
         ca_jour = db.session.query(func.sum(Vente.total)).filter(
             Vente.date >= today_start).scalar() or 0
         nb_ventes_jour = Vente.query.filter(Vente.date >= today_start).count()
-        stock_bas_count = Produit.query.filter(Produit.stock < STOCK_BAS_SEUIL,
-                                               Produit.stock > 0).count()
+        stock_bas_count = Produit.query.filter(Produit.stock < seuil,
+                                               Produit.stock >= 0).count()
         agents_actifs = User.query.filter_by(role='agent', actif=True).count()
 
-        # Ventes des 7 derniers jours
         ventes_7j = []
         for i in range(6, -1, -1):
             jour = (now - timedelta(days=i)).date()
@@ -677,7 +769,6 @@ def api_dashboard_stats():
                 Vente.date.between(debut_jour, fin_jour)).scalar() or 0
             ventes_7j.append({'date': jour.strftime('%d/%m'), 'montant': round(total_j, 2)})
 
-        # Top agents (30 derniers jours)
         il_y_a_30j = now - timedelta(days=30)
         top_agents_q = db.session.query(
             User.id, User.nom, User.photo_profil,
@@ -687,24 +778,14 @@ def api_dashboard_stats():
          .group_by(User.id, User.nom, User.photo_profil)\
          .order_by(func.sum(Vente.total).desc())\
          .limit(5).all()
-        top_agents = [{'nom': r.nom,
-                       'photo': r.photo_profil,
+        top_agents = [{'nom': r.nom, 'photo': r.photo_profil,
                        'montant': round(r.total_ventes, 2)} for r in top_agents_q]
 
-        # Produits en stock bas
         stock_bas = Produit.query.filter(
-            Produit.stock < STOCK_BAS_SEUIL, Produit.stock >= 0
+            Produit.stock < seuil, Produit.stock >= 0
         ).order_by(Produit.stock).limit(10).all()
         stock_bas_list = [{'id': p.id, 'nom': p.nom, 'stock': p.stock} for p in stock_bas]
 
-        # Répartition par catégorie (30 derniers jours)
-        cat_query = db.session.query(
-            LigneVente.nom_produit, func.sum(LigneVente.sous_total).label('total')
-        ).join(Vente, Vente.id == LigneVente.vente_id)\
-         .filter(Vente.date >= il_y_a_30j)\
-         .group_by(LigneVente.produit_id)
-
-        # Répartition par catégorie (via produit)
         cat_ventes_q = db.session.query(
             Produit.categorie,
             func.sum(LigneVente.sous_total).label('total')
@@ -715,7 +796,6 @@ def api_dashboard_stats():
         ventes_cat = [{'categorie': r.categorie, 'montant': round(r.total, 2)}
                       for r in cat_ventes_q]
 
-        params = get_params()
         return jsonify({
             'ca_jour': round(ca_jour, 2),
             'nb_ventes_jour': nb_ventes_jour,
@@ -815,45 +895,49 @@ def parametres():
     params = get_params()
     if request.method == 'POST':
         try:
-            old_nom = params.nom_magasin
-            old_devise = params.devise_active
-            old_taux = params.taux_change_usd_fc
+            old_snap = (params.nom_magasin, params.devise_active,
+                        params.taux_change_usd_fc, params.adresse,
+                        params.telephone, params.site_web,
+                        params.message_recu, params.seuil_stock_bas, params.pagination)
 
-            params.nom_magasin = request.form.get('nom_magasin', params.nom_magasin).strip()
+            params.nom_magasin = request.form.get('nom_magasin', params.nom_magasin).strip() or params.nom_magasin
             params.devise_active = request.form.get('devise_active', params.devise_active)
             params.taux_change_usd_fc = float(request.form.get('taux_change', params.taux_change_usd_fc))
+            params.adresse = request.form.get('adresse', '').strip() or None
+            params.telephone = request.form.get('telephone', '').strip() or None
+            params.site_web = request.form.get('site_web', '').strip() or None
+            params.message_recu = request.form.get('message_recu', '').strip() or 'Merci pour votre achat !'
+            seuil_raw = request.form.get('seuil_stock_bas', '5').strip()
+            pagi_raw = request.form.get('pagination', '20').strip()
+            params.seuil_stock_bas = max(1, int(seuil_raw)) if seuil_raw.isdigit() else 5
+            params.pagination = max(5, min(100, int(pagi_raw))) if pagi_raw.isdigit() else 20
 
-            # Logo
+            # Logo — résolution plus grande pour conserver les détails
             file = request.files.get('logo')
             if file and file.filename:
-                if allowed_file(file.filename):
-                    old_logo = params.logo
-                    new_logo = save_image(file, prefix='logo')
-                    if new_logo:
-                        params.logo = new_logo
-                        if old_logo:
-                            delete_image(old_logo)
+                new_logo = save_image(file, prefix='logo', max_size=(600, 300))
+                if new_logo:
+                    if params.logo:
+                        delete_image(params.logo)
+                    params.logo = new_logo
                 else:
-                    flash('Format logo non autorisé.', 'warning')
+                    flash('Image logo invalide ou format non autorisé.', 'warning')
 
-            changes = []
-            if old_nom != params.nom_magasin:
-                changes.append(f"nom: {old_nom}→{params.nom_magasin}")
-            if old_devise != params.devise_active:
-                changes.append(f"devise: {old_devise}→{params.devise_active}")
-            if old_taux != params.taux_change_usd_fc:
-                changes.append(f"taux: {old_taux}→{params.taux_change_usd_fc}")
-
-            if changes:
-                log_audit('MODIF_PARAMETRES', '; '.join(changes),
-                          ancienne_valeur=f"nom={old_nom}, devise={old_devise}, taux={old_taux}",
-                          nouvelle_valeur=f"nom={params.nom_magasin}, devise={params.devise_active}, taux={params.taux_change_usd_fc}")
+            new_snap = (params.nom_magasin, params.devise_active,
+                        params.taux_change_usd_fc, params.adresse,
+                        params.telephone, params.site_web,
+                        params.message_recu, params.seuil_stock_bas, params.pagination)
+            if old_snap != new_snap:
+                log_audit('MODIF_PARAMETRES',
+                          f"Paramètres mis à jour par {session.get('nom', '')}",
+                          ancienne_valeur=str(old_snap),
+                          nouvelle_valeur=str(new_snap))
             db.session.commit()
             flash('Paramètres mis à jour.', 'success')
             return redirect(url_for('parametres'))
         except ValueError:
             db.session.rollback()
-            flash('Taux de change invalide.', 'danger')
+            flash('Valeur numérique invalide (taux de change, seuil ou pagination).', 'danger')
         except Exception:
             db.session.rollback()
             flash('Erreur lors de la mise à jour.', 'danger')
@@ -866,6 +950,7 @@ def parametres():
 @app.route('/audit')
 @admin_required
 def audit():
+    params = get_params()
     page = request.args.get('page', 1, type=int)
     user_filtre = request.args.get('user_id', type=int)
     action_filtre = request.args.get('action', '').strip()
@@ -879,7 +964,7 @@ def audit():
     elif periode == '30j':
         debut = now - timedelta(days=30)
     else:
-        debut = None  # tout
+        debut = None
 
     query = AuditLog.query
     if debut:
@@ -890,7 +975,7 @@ def audit():
         query = query.filter(AuditLog.action.ilike(f'%{action_filtre}%'))
 
     logs = query.order_by(AuditLog.date_heure.desc())\
-        .paginate(page=page, per_page=PAGINATION, error_out=False)
+        .paginate(page=page, per_page=params.pagination or 20, error_out=False)
     users = User.query.order_by(User.nom).all()
     actions = db.session.query(AuditLog.action).distinct().order_by(AuditLog.action).all()
     actions = [a[0] for a in actions]
@@ -899,11 +984,108 @@ def audit():
                            periode=periode)
 
 
+@app.route('/audit/export.csv')
+@admin_required
+def audit_export_csv():
+    """Export du journal d'audit en CSV."""
+    user_filtre = request.args.get('user_id', type=int)
+    action_filtre = request.args.get('action', '').strip()
+    periode = request.args.get('periode', '30j')
+
+    now = datetime.utcnow()
+    if periode == 'aujourd_hui':
+        debut = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif periode == '7j':
+        debut = now - timedelta(days=7)
+    elif periode == '30j':
+        debut = now - timedelta(days=30)
+    else:
+        debut = None
+
+    query = AuditLog.query
+    if debut:
+        query = query.filter(AuditLog.date_heure >= debut)
+    if user_filtre:
+        query = query.filter(AuditLog.user_id == user_filtre)
+    if action_filtre:
+        query = query.filter(AuditLog.action.ilike(f'%{action_filtre}%'))
+    logs = query.order_by(AuditLog.date_heure.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Date/Heure', 'Utilisateur', 'Action', 'Détail',
+                     'Ancienne valeur', 'Nouvelle valeur', 'IP'])
+    for log in logs:
+        writer.writerow([
+            log.date_heure.strftime('%Y-%m-%d %H:%M:%S'),
+            log.user.nom if log.user else 'Système',
+            log.action,
+            log.detail or '',
+            log.ancienne_valeur or '',
+            log.nouvelle_valeur or '',
+            log.ip_address or '',
+        ])
+
+    filename = f"audit_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.csv"
+    return Response(
+        '\ufeff' + output.getvalue(),   # BOM UTF-8 pour Excel
+        mimetype='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
+
+
+@app.route('/historique/export.csv')
+@admin_required
+def historique_export_csv():
+    """Export de l'historique des ventes en CSV."""
+    periode = request.args.get('periode', 'mois')
+    agent_id_filtre = request.args.get('agent_id', type=int)
+
+    now = datetime.utcnow()
+    if periode == 'jour':
+        debut = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif periode == 'semaine':
+        debut = now - timedelta(days=now.weekday())
+        debut = debut.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        debut = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    query = Vente.query.filter(Vente.date >= debut)
+    if agent_id_filtre:
+        query = query.filter(Vente.agent_id == agent_id_filtre)
+    ventes = query.order_by(Vente.date.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['N° Reçu', 'Date', 'Agent', 'Total', 'Devise', 'Articles'])
+    for v in ventes:
+        agent = User.query.get(v.agent_id)
+        lignes = v.lignes.all()
+        articles = '; '.join(f"{l.nom_produit} x{l.quantite}" for l in lignes)
+        writer.writerow([
+            v.numero_recu,
+            v.date.strftime('%Y-%m-%d %H:%M'),
+            agent.nom if agent else 'N/A',
+            f"{v.total:.2f}",
+            v.devise,
+            articles,
+        ])
+
+    filename = f"ventes_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.csv"
+    return Response(
+        '\ufeff' + output.getvalue(),
+        mimetype='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
+
+
 # ──────────────────────────────────────────────────────────
 # Fichiers uploadés
 # ──────────────────────────────────────────────────────────
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
+    # Sécurité : uniquement les noms de fichiers simples (pas de traversée de répertoire)
+    filename = os.path.basename(filename)
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
@@ -918,6 +1100,12 @@ def forbidden(e):
 @app.errorhandler(404)
 def not_found(e):
     return render_template('errors/404.html'), 404
+
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    flash('Trop de tentatives. Veuillez patienter une minute avant de réessayer.', 'danger')
+    return redirect(url_for('login'))
 
 
 @app.errorhandler(500)

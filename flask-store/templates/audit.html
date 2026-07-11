@@ -2,15 +2,27 @@
 {% block title %}Journal d'audit — {{ params.nom_magasin }}{% endblock %}
 {% block page_title %}Journal d'audit{% endblock %}
 
+{% block topbar_actions %}
+<a href="{{ url_for('audit_export_csv', periode=periode, user_id=user_filtre or '', action=action_filtre) }}"
+   class="btn btn-ghost btn-sm" title="Exporter en CSV">
+  <svg viewBox="0 0 24 24" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  Exporter CSV
+</a>
+{% endblock %}
+
 {% block content %}
 <div class="card">
   <div class="card-header filter-bar">
-    <form method="GET" class="filter-form">
+    <form method="GET" class="filter-form" id="audit-filter-form">
       <div class="btn-group">
-        <a href="?periode=aujourd_hui&user_id={{ user_filtre or '' }}&action={{ action_filtre }}" class="btn btn-sm {% if periode == 'aujourd_hui' %}btn-primary{% else %}btn-ghost{% endif %}">Aujourd'hui</a>
-        <a href="?periode=7j&user_id={{ user_filtre or '' }}&action={{ action_filtre }}" class="btn btn-sm {% if periode == '7j' %}btn-primary{% else %}btn-ghost{% endif %}">7 jours</a>
-        <a href="?periode=30j&user_id={{ user_filtre or '' }}&action={{ action_filtre }}" class="btn btn-sm {% if periode == '30j' %}btn-primary{% else %}btn-ghost{% endif %}">30 jours</a>
-        <a href="?periode=tout&user_id={{ user_filtre or '' }}&action={{ action_filtre }}" class="btn btn-sm {% if periode == 'tout' %}btn-primary{% else %}btn-ghost{% endif %}">Tout</a>
+        <a href="?periode=aujourd_hui{% if user_filtre %}&user_id={{ user_filtre }}{% endif %}{% if action_filtre %}&action={{ action_filtre }}{% endif %}"
+           class="btn btn-sm {% if periode == 'aujourd_hui' %}btn-primary{% else %}btn-ghost{% endif %}">Aujourd'hui</a>
+        <a href="?periode=7j{% if user_filtre %}&user_id={{ user_filtre }}{% endif %}{% if action_filtre %}&action={{ action_filtre }}{% endif %}"
+           class="btn btn-sm {% if periode == '7j' %}btn-primary{% else %}btn-ghost{% endif %}">7 jours</a>
+        <a href="?periode=30j{% if user_filtre %}&user_id={{ user_filtre }}{% endif %}{% if action_filtre %}&action={{ action_filtre }}{% endif %}"
+           class="btn btn-sm {% if periode == '30j' %}btn-primary{% else %}btn-ghost{% endif %}">30 jours</a>
+        <a href="?periode=tout{% if user_filtre %}&user_id={{ user_filtre }}{% endif %}{% if action_filtre %}&action={{ action_filtre }}{% endif %}"
+           class="btn btn-sm {% if periode == 'tout' %}btn-primary{% else %}btn-ghost{% endif %}">Tout</a>
       </div>
       <select name="user_id" onchange="this.form.submit()" class="select-input">
         <option value="">Tous les utilisateurs</option>
@@ -28,6 +40,13 @@
     </form>
   </div>
 
+  {% if logs.total > 0 %}
+  <div class="audit-summary">
+    <span class="audit-count">{{ logs.total }} entrée{{ 's' if logs.total > 1 else '' }}</span>
+    {% if periode != 'tout' %}<span class="text-muted">· {{ periode }}</span>{% endif %}
+  </div>
+  {% endif %}
+
   <div class="table-responsive">
     <table class="table table-sm">
       <thead>
@@ -36,25 +55,54 @@
           <th>Utilisateur</th>
           <th>Action</th>
           <th>Détail</th>
-          <th>Ancienne valeur</th>
-          <th>Nouvelle valeur</th>
+          <th>IP</th>
+          <th>Diff</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs.items %}
-        <tr>
-          <td class="mono text-muted">{{ log.date_heure.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+        <tr class="audit-row">
+          <td class="mono text-muted" style="white-space:nowrap">{{ log.date_heure.strftime('%d/%m/%Y %H:%M:%S') }}</td>
           <td>
-            {% if log.user %}{{ log.user.nom }}
-            {% else %}<span class="text-muted">Système</span>{% endif %}
+            {% if log.user %}
+              <span class="audit-user">{{ log.user.nom }}</span>
+            {% else %}
+              <span class="text-muted">Système</span>
+            {% endif %}
           </td>
-          <td><span class="audit-action audit-{{ log.action.split('_')[0] | lower }}">{{ log.action }}</span></td>
-          <td class="text-muted">{{ log.detail or '—' }}</td>
-          <td class="mono text-muted text-sm">{{ log.ancienne_valeur or '—' }}</td>
-          <td class="mono text-sm">{{ log.nouvelle_valeur or '—' }}</td>
+          <td>
+            <span class="audit-action audit-{{ log.action.split('_')[0] | lower }}">{{ log.action }}</span>
+          </td>
+          <td class="text-muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+              title="{{ log.detail or '' }}">{{ log.detail or '—' }}</td>
+          <td class="mono text-muted" style="font-size:.72rem">{{ log.ip_address or '—' }}</td>
+          <td>
+            {% if log.ancienne_valeur or log.nouvelle_valeur %}
+            <button class="btn-diff-toggle" onclick="toggleDiff(this)" title="Voir les changements">
+              <svg viewBox="0 0 24 24" width="13" height="13"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="diff-block" style="display:none">
+              {% if log.ancienne_valeur %}
+              <div class="diff-old"><span class="diff-label">Avant</span>{{ log.ancienne_valeur }}</div>
+              {% endif %}
+              {% if log.nouvelle_valeur %}
+              <div class="diff-new"><span class="diff-label">Après</span>{{ log.nouvelle_valeur }}</div>
+              {% endif %}
+            </div>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="empty-row">Aucune entrée d'audit pour cette période.</td></tr>
+        <tr>
+          <td colspan="6" class="empty-row">
+            <div class="empty-state-inline">
+              <svg viewBox="0 0 24 24" width="32" height="32"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <p>Aucune entrée d'audit pour cette période.</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -72,4 +120,15 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleDiff(btn) {
+  const diff = btn.nextElementSibling;
+  const open = diff.style.display !== 'none';
+  diff.style.display = open ? 'none' : 'block';
+  btn.classList.toggle('open', !open);
+}
+</script>
 {% endblock %}

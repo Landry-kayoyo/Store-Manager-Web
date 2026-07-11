@@ -164,9 +164,13 @@ function validerVente() {
   modal.style.display = '';
 
   const lignes = panier.map(i => ({ produit_id: i.produit_id, quantite: i.quantite }));
+  const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || (typeof CSRF_TOKEN !== 'undefined' ? CSRF_TOKEN : '');
   fetch(window.location.pathname, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken,
+    },
     body: JSON.stringify({ lignes })
   })
   .then(r => r.json())

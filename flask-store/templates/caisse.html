@@ -8,9 +8,10 @@
   <div class="card caisse-catalogue">
     <div class="card-header">
       <h3>Produits</h3>
-      <input type="text" id="produit-search" placeholder="Rechercher…" class="input-search" oninput="filtrerProduits()">
+      <input type="text" id="produit-search" placeholder="Rechercher…"
+             class="input-search" oninput="filtrerProduits()" autocomplete="off">
     </div>
-    <div class="card-body">
+    <div class="card-body caisse-catalogue-body">
       <div class="cat-tabs" id="cat-tabs"></div>
       <div class="produits-grid" id="produits-grid"></div>
     </div>
@@ -19,14 +20,17 @@
   <!-- Panier -->
   <div class="card caisse-panier">
     <div class="card-header">
-      <h3>Panier</h3>
+      <h3>
+        Panier
+        <span class="panier-count" id="panier-count" style="display:none"></span>
+      </h3>
       <button class="btn btn-ghost btn-sm" onclick="viderPanier()">Vider</button>
     </div>
-    <div class="card-body panier-body">
+    <div class="card-body panier-body" id="panier-body">
       <div id="panier-vide" class="empty-state">
-        <svg viewBox="0 0 24 24" width="48" height="48"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-        <p>Le panier est vide.</p>
-        <p class="text-muted">Cliquez sur un produit pour l'ajouter.</p>
+        <svg viewBox="0 0 24 24" width="40" height="40"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <p>Panier vide</p>
+        <p class="text-muted" style="font-size:.8rem">Cliquez sur un produit pour l'ajouter.</p>
       </div>
       <div id="panier-items"></div>
     </div>
@@ -41,12 +45,14 @@
         <span>Total</span><span id="total-final">{{ format_montant(0) }}</span>
       </div>
       <button class="btn btn-accent btn-full" id="btn-valider" onclick="validerVente()" disabled>
+        <svg viewBox="0 0 24 24" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
         Valider la vente
       </button>
     </div>
   </div>
 </div>
 
+<!-- Modal de chargement -->
 <div id="modal-loading" class="modal-overlay" style="display:none">
   <div class="modal-box">
     <div class="spinner"></div>
@@ -58,8 +64,9 @@
 {% block scripts %}
 <script>
   const PRODUITS = {{ produits_json | safe }};
-  const DEVISE = "{{ params.devise_active }}";
-  const TAUX = {{ params.taux_change_usd_fc }};
+  const DEVISE   = "{{ params.devise_active }}";
+  const TAUX     = {{ params.taux_change_usd_fc }};
+  const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
 </script>
 <script src="{{ url_for('static', filename='js/caisse.js') }}"></script>
 {% endblock %}

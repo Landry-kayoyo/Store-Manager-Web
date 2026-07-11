@@ -91,10 +91,21 @@ class Promotion(db.Model):
 class Parametres(db.Model):
     __tablename__ = 'parametres'
     id = db.Column(db.Integer, primary_key=True)
+    # Identité
     nom_magasin = db.Column(db.String(200), default='Mon Magasin', nullable=False)
     logo = db.Column(db.String(200), nullable=True)
+    # Contact (affiché sur les reçus)
+    adresse = db.Column(db.Text, nullable=True)
+    telephone = db.Column(db.String(50), nullable=True)
+    site_web = db.Column(db.String(200), nullable=True)
+    # Reçu
+    message_recu = db.Column(db.String(300), default='Merci pour votre achat !', nullable=False)
+    # Devise
     devise_active = db.Column(db.String(10), default='FC', nullable=False)  # 'FC' ou 'USD'
     taux_change_usd_fc = db.Column(db.Float, default=2800.0, nullable=False)
+    # Seuils opérationnels
+    seuil_stock_bas = db.Column(db.Integer, default=5, nullable=False)
+    pagination = db.Column(db.Integer, default=20, nullable=False)
 
     def __repr__(self):
         return f'<Parametres {self.nom_magasin}>'
@@ -108,7 +119,8 @@ class AuditLog(db.Model):
     detail = db.Column(db.Text, nullable=True)
     ancienne_valeur = db.Column(db.Text, nullable=True)
     nouvelle_valeur = db.Column(db.Text, nullable=True)
-    date_heure = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    ip_address = db.Column(db.String(45), nullable=True)
+    date_heure = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
 
     def __repr__(self):
         return f'<AuditLog {self.action} at {self.date_heure}>'

@@ -74,7 +74,13 @@ input, textarea, select, button { font: inherit; }
   align-items: center;
   gap: 10px;
 }
-.store-logo { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+/* Logo dans la sidebar — s'adapte aux formats rectangulaires */
+.store-logo-wrap {
+  width: 40px; height: 32px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; overflow: hidden; background: rgba(255,255,255,.1);
+}
+.store-logo { max-width: 40px; max-height: 32px; width: auto; height: auto; object-fit: contain; display: block; }
 .store-logo-placeholder {
   width: 36px; height: 36px; border-radius: 6px;
   background: var(--accent); color: var(--primary-dark);
@@ -351,7 +357,13 @@ textarea { resize: vertical; min-height: 80px; }
 .login-brand { text-align: center; margin-bottom: 24px; color: #fff; }
 .login-brand h1 { font-size: 1.5rem; font-weight: 800; margin-top: 12px; }
 .login-brand p { color: rgba(255,255,255,.5); font-size: .85rem; margin-top: 4px; }
-.login-logo { width: 72px; height: 72px; border-radius: 12px; object-fit: cover; margin: 0 auto; }
+/* Logo login — s'adapte aux formats portrait ou paysage */
+.login-logo-wrap {
+  display: flex; align-items: center; justify-content: center;
+  width: 160px; height: 72px; margin: 0 auto;
+  background: rgba(255,255,255,.1); border-radius: 12px; overflow: hidden;
+}
+.login-logo { max-width: 156px; max-height: 68px; width: auto; height: auto; object-fit: contain; display: block; }
 .login-logo-placeholder { width: 72px; height: 72px; border-radius: 12px; background: var(--accent); color: var(--primary-dark); display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; margin: 0 auto; }
 .login-card { background: var(--surface); border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow-md); }
 .login-card h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; }
@@ -413,7 +425,10 @@ textarea { resize: vertical; min-height: 80px; }
   border: 1px solid var(--border); box-shadow: var(--shadow-md);
 }
 .receipt-header { text-align: center; margin-bottom: 12px; }
-.receipt-logo { max-height: 48px; margin: 0 auto 8px; }
+/* Logo reçu — rectangle ou carré */
+.receipt-logo-wrap { display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; max-width: 200px; max-height: 60px; }
+.receipt-logo { max-width: 200px; max-height: 60px; width: auto; height: auto; object-fit: contain; display: block; margin: 0 auto; }
+.receipt-logo-initial { width: 48px; height: 48px; border-radius: 8px; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; margin: 0 auto 8px; }
 .receipt-header h2 { font-size: 1rem; font-weight: 700; }
 .receipt-subtitle { font-size: .75rem; color: var(--text-muted); margin-top: 2px; }
 .receipt-divider { color: var(--text-muted); font-size: .75rem; text-align: center; margin: 10px 0; }
@@ -527,3 +542,104 @@ textarea { resize: vertical; min-height: 80px; }
   .main-content { margin: 0; }
   .content-body { padding: 0; }
 }
+
+/* ══════════════════════════════════════════════════════
+   Sidebar overlay (mobile fermeture au clic)
+══════════════════════════════════════════════════════ */
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  z-index: 199;
+}
+@media (max-width: 768px) {
+  .sidebar.open ~ .sidebar-overlay,
+  .sidebar-overlay.visible { display: block; }
+}
+
+/* ══════════════════════════════════════════════════════
+   Caisse — améliorations mobile
+══════════════════════════════════════════════════════ */
+.caisse-catalogue-body { max-height: calc(100vh - 220px); overflow-y: auto; }
+.panier-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent); color: var(--primary-dark);
+  font-size: .7rem; font-weight: 800; min-width: 18px; height: 18px;
+  border-radius: 9px; padding: 0 5px; margin-left: 6px;
+}
+@media (max-width: 900px) {
+  .caisse-layout { grid-template-columns: 1fr; }
+  .caisse-catalogue-body { max-height: 45vh; }
+  .caisse-panier .panier-body { max-height: 35vh; overflow-y: auto; }
+}
+
+/* ══════════════════════════════════════════════════════
+   Receipt — nouvelles sections
+══════════════════════════════════════════════════════ */
+.receipt-store-name { font-size: .95rem; font-weight: 800; margin: 4px 0 2px; }
+.receipt-contact { font-size: .68rem; color: var(--text-muted); margin: 1px 0; }
+.receipt-num-badge {
+  font-family: monospace; font-size: .8rem; font-weight: 700;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 3px 8px; color: var(--text-muted);
+}
+
+/* ══════════════════════════════════════════════════════
+   Paramètres — logo upload & nouveaux champs
+══════════════════════════════════════════════════════ */
+.logo-upload-row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.logo-preview-box {
+  width: 160px; height: 80px; border: 2px dashed var(--border);
+  border-radius: var(--radius); background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0; transition: border-color .2s;
+}
+.logo-preview-box:hover { border-color: var(--accent); }
+.logo-preview-box img { max-width: 156px; max-height: 76px; object-fit: contain; }
+.logo-preview-placeholder { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-muted); font-size: .75rem; }
+.logo-upload-info { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.input-with-suffix { display: flex; align-items: center; gap: 0; }
+.input-with-suffix input { border-radius: var(--radius-sm) 0 0 var(--radius-sm); flex: 1; }
+.input-suffix {
+  padding: 8px 12px; background: var(--bg); border: 1px solid var(--border);
+  border-left: none; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: .8rem; color: var(--text-muted); white-space: nowrap;
+}
+.badge-hint {
+  font-size: .7rem; font-weight: 500; color: var(--text-muted);
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 2px 8px; margin-left: 8px;
+  vertical-align: middle;
+}
+.required { color: var(--danger); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+
+/* ══════════════════════════════════════════════════════
+   Audit — diff, résumé
+══════════════════════════════════════════════════════ */
+.audit-summary { padding: 8px 20px; border-bottom: 1px solid var(--border); background: var(--bg); font-size: .8rem; }
+.audit-count { font-weight: 700; color: var(--primary); }
+.audit-user { font-weight: 600; }
+.audit-row:hover { background: var(--bg); }
+.btn-diff-toggle {
+  background: none; border: 1px solid var(--border); cursor: pointer; padding: 2px 6px;
+  border-radius: 4px; color: var(--text-muted); transition: all .15s; display: inline-flex;
+}
+.btn-diff-toggle:hover { border-color: var(--primary); color: var(--primary); }
+.btn-diff-toggle.open svg { transform: rotate(180deg); }
+.diff-block { margin-top: 6px; font-size: .75rem; display: flex; flex-direction: column; gap: 4px; min-width: 200px; }
+.diff-old { background: var(--danger-light); color: #7f1d1d; border-radius: 3px; padding: 4px 8px; border-left: 3px solid var(--danger); }
+.diff-new { background: var(--success-light); color: #14532d; border-radius: 3px; padding: 4px 8px; border-left: 3px solid var(--success); }
+.diff-label { font-weight: 700; font-size: .68rem; text-transform: uppercase; margin-right: 6px; }
+.empty-state-inline { display: flex; flex-direction: column; align-items: center; padding: 28px 16px; gap: 8px; color: var(--text-muted); }
+.empty-state-inline svg { color: var(--border-dark); }
+.empty-state-inline p { font-size: .875rem; }
+
+/* ══════════════════════════════════════════════════════
+   Stock — état vide illustré
+══════════════════════════════════════════════════════ */
+.empty-state-full {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 48px 24px; gap: 12px; color: var(--text-muted); text-align: center;
+}
+.empty-state-full svg { color: var(--border-dark); margin-bottom: 4px; }
+.empty-state-full p { font-size: .95rem; font-weight: 500; }
+
