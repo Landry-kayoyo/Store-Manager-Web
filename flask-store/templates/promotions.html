@@ -82,6 +82,7 @@
           </div>
           <form method="POST" action="{{ url_for('promotion_supprimer', id=p.id) }}"
                 onsubmit="return confirm('Supprimer cette promotion ?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
           </form>
         </div>
@@ -106,6 +107,7 @@
           </div>
           <form method="POST" action="{{ url_for('promotion_supprimer', id=p.id) }}"
                 onsubmit="return confirm('Supprimer cette promotion ?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-ghost">Annuler</button>
           </form>
         </div>

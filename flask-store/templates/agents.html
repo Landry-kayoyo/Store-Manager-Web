@@ -52,6 +52,7 @@
               <a href="{{ url_for('agent_modifier', id=a.id) }}" class="btn btn-sm btn-outline">Modifier</a>
               <form method="POST" action="{{ url_for('agent_supprimer', id=a.id) }}"
                     onsubmit="return confirm('Supprimer le compte de {{ a.nom }} ? Ses ventes seront conservées.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
               </form>
             </div>

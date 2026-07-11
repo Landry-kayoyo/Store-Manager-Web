@@ -143,7 +143,14 @@
 
   <script>
     window.onload = function() {
-      if (!document.referrer.includes('/historique') && !document.referrer.includes('/vente/')) {
+      // Imprimer automatiquement seulement à la première visite (depuis la caisse),
+      // pas en cas de rechargement ni de navigation depuis l'historique.
+      const key = 'recu_printed_{{ vente.id }}';
+      const fromHistorique = document.referrer.includes('/historique');
+      const fromRecu = document.referrer.includes('/vente/');
+      const alreadyPrinted = sessionStorage.getItem(key);
+      if (!fromHistorique && !fromRecu && !alreadyPrinted) {
+        sessionStorage.setItem(key, '1');
         window.print();
       }
     };

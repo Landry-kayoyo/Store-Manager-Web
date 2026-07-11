@@ -107,10 +107,12 @@ function renderPanier() {
   const empty = document.getElementById('panier-vide');
   const btnValider = document.getElementById('btn-valider');
 
+  const countEl = document.getElementById('panier-count');
   if (!panier.length) {
     empty.style.display = '';
     container.innerHTML = '';
     btnValider.disabled = true;
+    if (countEl) { countEl.textContent = ''; countEl.style.display = 'none'; }
     document.getElementById('total-brut').textContent = '—';
     document.getElementById('total-final').textContent = formatMontant(0);
     document.getElementById('promo-line').style.display = 'none';
@@ -118,6 +120,8 @@ function renderPanier() {
   }
   empty.style.display = 'none';
   btnValider.disabled = false;
+  const totalQty = panier.reduce((s, i) => s + i.quantite, 0);
+  if (countEl) { countEl.textContent = totalQty; countEl.style.display = ''; }
 
   let totalBrut = 0, totalFinal = 0;
   container.innerHTML = panier.map(item => {
