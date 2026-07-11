@@ -16,8 +16,14 @@ from flask import (Flask, render_template, request, redirect, url_for,
                    Response)
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect, generate_csrf
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+
+# Flask-Limiter est optionnel — si non installé, un décorateur no-op est utilisé
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    _HAS_LIMITER = True
+except ImportError:
+    _HAS_LIMITER = False
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
@@ -57,13 +63,26 @@ if os.environ.get('SECRET_KEY'):
 app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 heure
 csrf = CSRFProtect(app)
 
-# ── Rate Limiter ─────────────────────────────────────────
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=[],
-    storage_uri="memory://",
-)
+# ── Rate Limiter (optionnel) ─────────────────────────────
+if _HAS_LIMITER:
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=[],
+        storage_uri="memory://",
+    )
+else:
+    # Fallback no-op : le décorateur @limiter.limit(...) ne fait rien
+    class _NoopLimiter:
+        def limit(self, *args, **kwargs):
+            def decorator(f):
+                return f
+            return decorator
+        def exempt(self, f):
+            return f
+    limiter = _NoopLimiter()
+    logging.warning("Flask-Limiter non installé — rate limiting désactivé. "
+                    "Installez-le avec : pip install flask-limiter")
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 DEVISES = ['FC', 'USD']
