@@ -1,0 +1,542 @@
+WHERE ventes.agent_id = ? AND ventes.date >= ?) AS anon_1]
+[parameters: (2, '2026-07-11 00:00:00.000000')]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-11 21:58:11,958: Exception on /dashboard [GET]
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: ventes.multi_devises
+**NO MATCH**
+The above exception was the direct cause of the following exception:
+**NO MATCH**
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 126, in decorated
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 356, in dashboard
+    ).count()
+      ^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 3153, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2842, in scalar
+    ret = self.one()
+          ^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2815, in one
+    return self._iter().one()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2373, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2271, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: ventes.multi_devises
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT ventes.id AS ventes_id, ventes.agent_id AS ventes_agent_id, ventes.date AS ventes_date, ventes.total AS ventes_total, ventes.devise AS ventes_devise, ventes.taux_change_utilise AS ventes_taux_change_utilise, ventes.numero_recu AS ventes_numero_recu, ventes.multi_devises AS ventes_multi_devises 
+FROM ventes 
+WHERE ventes.agent_id = ? AND ventes.date >= ?) AS anon_1]
+[parameters: (2, '2026-07-11 00:00:00.000000')]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-11 21:59:08,363: Exception on /stock [GET]
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: produits.devise
+**NO MATCH**
+The above exception was the direct cause of the following exception:
+**NO MATCH**
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 126, in decorated
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 416, in stock
+    produits = query.paginate(page=page, per_page=params.pagination or 20, error_out=False)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/query.py", line 98, in paginate
+    return QueryPagination(
+           ^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/pagination.py", line 72, in __init__
+    items = self._query_items()
+            ^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/pagination.py", line 358, in _query_items
+    out = query.limit(self.per_page).offset(self._query_offset).all()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2711, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2373, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2271, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: produits.devise
+[SQL: SELECT produits.id AS produits_id, produits.nom AS produits_nom, produits.categorie AS produits_categorie, produits.prix AS produits_prix, produits.devise AS produits_devise, produits.stock AS produits_stock, produits.description AS produits_description, produits.image AS produits_image 
+FROM produits ORDER BY produits.categorie, produits.nom
+ LIMIT ? OFFSET ?]
+[parameters: (20, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-11 21:59:16,136: Exception on /stock [GET]
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: produits.devise
+**NO MATCH**
+The above exception was the direct cause of the following exception:
+**NO MATCH**
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 126, in decorated
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 416, in stock
+    produits = query.paginate(page=page, per_page=params.pagination or 20, error_out=False)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/query.py", line 98, in paginate
+    return QueryPagination(
+           ^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/pagination.py", line 72, in __init__
+    items = self._query_items()
+            ^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/pagination.py", line 358, in _query_items
+    out = query.limit(self.per_page).offset(self._query_offset).all()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2711, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2373, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2271, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: produits.devise
+[SQL: SELECT produits.id AS produits_id, produits.nom AS produits_nom, produits.categorie AS produits_categorie, produits.prix AS produits_prix, produits.devise AS produits_devise, produits.stock AS produits_stock, produits.description AS produits_description, produits.image AS produits_image 
+FROM produits ORDER BY produits.categorie, produits.nom
+ LIMIT ? OFFSET ?]
+[parameters: (20, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-11 21:59:26,344: Exception on /caisse [GET]
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: produits.devise
+**NO MATCH**
+The above exception was the direct cause of the following exception:
+**NO MATCH**
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 126, in decorated
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 547, in caisse
+    produits = Produit.query.order_by(Produit.categorie, Produit.nom).all()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2711, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2373, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2271, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: produits.devise
+[SQL: SELECT produits.id AS produits_id, produits.nom AS produits_nom, produits.categorie AS produits_categorie, produits.prix AS produits_prix, produits.devise AS produits_devise, produits.stock AS produits_stock, produits.description AS produits_description, produits.image AS produits_image 
+FROM produits ORDER BY produits.categorie, produits.nom]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-11 21:59:36,769: Exception on /historique [GET]
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: ventes.multi_devises
+**NO MATCH**
+The above exception was the direct cause of the following exception:
+**NO MATCH**
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 126, in decorated
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 716, in historique
+    ventes = query.order_by(Vente.date.desc()).paginate(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/query.py", line 98, in paginate
+    return QueryPagination(
+           ^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/pagination.py", line 72, in __init__
+    items = self._query_items()
+            ^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/pagination.py", line 358, in _query_items
+    out = query.limit(self.per_page).offset(self._query_offset).all()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2711, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2373, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2271, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: ventes.multi_devises
+[SQL: SELECT ventes.id AS ventes_id, ventes.agent_id AS ventes_agent_id, ventes.date AS ventes_date, ventes.total AS ventes_total, ventes.devise AS ventes_devise, ventes.taux_change_utilise AS ventes_taux_change_utilise, ventes.numero_recu AS ventes_numero_recu, ventes.multi_devises AS ventes_multi_devises 
+FROM ventes 
+WHERE ventes.date >= ? ORDER BY ventes.date DESC
+ LIMIT ? OFFSET ?]
+[parameters: ('2026-07-01 00:00:00.000000', 20, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-11 22:01:19,342: Exception on /historique [GET]
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: ventes.multi_devises
+**NO MATCH**
+The above exception was the direct cause of the following exception:
+**NO MATCH**
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 151, in decorated
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 741, in historique
+    ventes = query.order_by(Vente.date.desc()).paginate(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/query.py", line 98, in paginate
+    return QueryPagination(
+           ^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/pagination.py", line 72, in __init__
+    items = self._query_items()
+            ^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask_sqlalchemy/pagination.py", line 358, in _query_items
+    out = query.limit(self.per_page).offset(self._query_offset).all()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2711, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2373, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2271, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: ventes.multi_devises
+[SQL: SELECT ventes.id AS ventes_id, ventes.agent_id AS ventes_agent_id, ventes.date AS ventes_date, ventes.total AS ventes_total, ventes.devise AS ventes_devise, ventes.taux_change_utilise AS ventes_taux_change_utilise, ventes.numero_recu AS ventes_numero_recu, ventes.multi_devises AS ventes_multi_devises 
+FROM ventes 
+WHERE ventes.date >= ? ORDER BY ventes.date DESC
+ LIMIT ? OFFSET ?]
+[parameters: ('2026-07-01 00:00:00.000000', 20, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-11 22:01:31,717: Exception on /dashboard [GET]
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: ventes.multi_devises
+**NO MATCH**
+The above exception was the direct cause of the following exception:
+**NO MATCH**
+Traceback (most recent call last):
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 151, in decorated
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/flask-store/app.py", line 381, in dashboard
+    ).count()
+      ^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 3153, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2842, in scalar
+    ret = self.one()
+          ^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2815, in one
+    return self._iter().one()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2373, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2271, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+    return meth(
+           ^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/katangatech/Store-Manager-Web/venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: ventes.multi_devises
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT ventes.id AS ventes_id, ventes.agent_id AS ventes_agent_id, ventes.date AS ventes_date, ventes.total AS ventes_total, ventes.devise AS ventes_devise, ventes.taux_change_utilise AS ventes_taux_change_utilise, ventes.numero_recu AS ventes_numero_recu, ventes.multi_devises AS ventes_multi_devises 
+FROM ventes 
+WHERE ventes.agent_id = ? AND ventes.date >= ?) AS anon_1]
+[parameters: (2, '2026-07-11 00:00:00.000000')]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-07-11 22:05:41,226: The CSRF token is missing.
