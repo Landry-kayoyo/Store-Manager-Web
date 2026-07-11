@@ -78,7 +78,7 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Migration douce : ajouter les nouvelles colonnes si absentes
 # ──────────────────────────────────────────────────────────
 def run_migrations():
-    """Ajoute les colonnes ajoutées sans casser la DB existante."""
+    """Ajoute toutes les colonnes manquantes sans casser la DB existante."""
     import sqlite3
     db_path = os.path.join(BASE_DIR, 'database.db')
     if not os.path.exists(db_path):
@@ -86,21 +86,39 @@ def run_migrations():
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
-    # Produit.devise
+    # ── Parametres ──────────────────────────────────────────
+    cur.execute("PRAGMA table_info(parametres)")
+    pcols = {row[1] for row in cur.fetchall()}
+    _param_cols = [
+        ('adresse',           "TEXT"),
+        ('telephone',         "VARCHAR(50)"),
+        ('site_web',          "VARCHAR(200)"),
+        ('message_recu',      "VARCHAR(300) DEFAULT 'Merci pour votre achat !'"),
+        ('devise_active',     "VARCHAR(10) NOT NULL DEFAULT 'FC'"),
+        ('taux_change_usd_fc',"REAL NOT NULL DEFAULT 2800.0"),
+        ('seuil_stock_bas',   "INTEGER NOT NULL DEFAULT 5"),
+        ('pagination',        "INTEGER NOT NULL DEFAULT 20"),
+    ]
+    for col_name, col_def in _param_cols:
+        if col_name not in pcols:
+            cur.execute(f"ALTER TABLE parametres ADD COLUMN {col_name} {col_def}")
+            app.logger.info(f"Migration : colonne parametres.{col_name} ajoutée.")
+
+    # ── Produit.devise ───────────────────────────────────────
     cur.execute("PRAGMA table_info(produits)")
     cols = {row[1] for row in cur.fetchall()}
     if 'devise' not in cols:
         cur.execute("ALTER TABLE produits ADD COLUMN devise TEXT NOT NULL DEFAULT 'FC'")
         app.logger.info("Migration : colonne produits.devise ajoutée.")
 
-    # Vente.multi_devises
+    # ── Vente.multi_devises ──────────────────────────────────
     cur.execute("PRAGMA table_info(ventes)")
     vcols = {row[1] for row in cur.fetchall()}
     if 'multi_devises' not in vcols:
         cur.execute("ALTER TABLE ventes ADD COLUMN multi_devises INTEGER NOT NULL DEFAULT 0")
         app.logger.info("Migration : colonne ventes.multi_devises ajoutée.")
 
-    # LigneVente.devise_produit et prix_unitaire_origine
+    # ── LigneVente ───────────────────────────────────────────
     cur.execute("PRAGMA table_info(lignes_vente)")
     lcols = {row[1] for row in cur.fetchall()}
     if 'devise_produit' not in lcols:
@@ -109,6 +127,13 @@ def run_migrations():
     if 'prix_unitaire_origine' not in lcols:
         cur.execute("ALTER TABLE lignes_vente ADD COLUMN prix_unitaire_origine REAL")
         app.logger.info("Migration : colonne lignes_vente.prix_unitaire_origine ajoutée.")
+
+    # ── AuditLog.ip_address ──────────────────────────────────
+    cur.execute("PRAGMA table_info(audit_logs)")
+    acols = {row[1] for row in cur.fetchall()}
+    if 'ip_address' not in acols:
+        cur.execute("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR(45)")
+        app.logger.info("Migration : colonne audit_logs.ip_address ajoutée.")
 
     conn.commit()
     conn.close()
