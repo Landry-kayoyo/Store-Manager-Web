@@ -16,7 +16,7 @@
   <div class="card-header filter-bar">
     <form method="GET" class="filter-form">
       <input type="text" name="q" value="{{ search }}" placeholder="Rechercher un produit…"
-             class="input-search" autocomplete="off">
+             class="input-search live-search" data-target="stock-tbody" autocomplete="off">
       <select name="categorie" class="select-input" onchange="this.form.submit()">
         <option value="">Toutes les catégories</option>
         {% for cat in categories %}
@@ -48,7 +48,7 @@
           {% if session.get('role') == 'admin' %}<th>Actions</th>{% endif %}
         </tr>
       </thead>
-      <tbody>
+      <tbody id="stock-tbody">
         {% for p in produits.items %}
         <tr>
           <td>

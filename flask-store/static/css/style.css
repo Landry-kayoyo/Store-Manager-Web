@@ -685,10 +685,27 @@ textarea { resize: vertical; min-height: 80px; }
   line-height: 1.4;
 }
 
-/* Info-box générique (déjà dans parametres) */
+/* Info-box générique */
 .info-box {
   background: var(--info-light); border: 1px solid #bfdbfe;
   border-radius: var(--radius); padding: 12px 16px;
   font-size: .85rem; color: #1e40af; margin-top: 16px;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+
+/* ══════════════════════════════════════════════════════
+   Dashboard — équivalent devise (FC + $)
+══════════════════════════════════════════════════════ */
+.kpi-equiv {
+  display: block;
+  font-size: .7rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+  letter-spacing: .01em;
+}
+.top-agent-amount .kpi-equiv {
+  display: inline;
+  margin-left: 4px;
 }
 

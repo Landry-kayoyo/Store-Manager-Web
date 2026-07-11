@@ -17,7 +17,10 @@
     </div>
   </div>
 
+  {% if session.get('role') == 'admin' %}
+  {# ── Admin : peut changer sa propre photo ── #}
   <form method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
       <label for="photo">Modifier la photo de profil</label>
       <input type="file" id="photo" name="photo" accept=".jpg,.jpeg,.png,.webp">
@@ -32,6 +35,13 @@
       <button type="submit" class="btn btn-primary">Mettre à jour la photo</button>
     </div>
   </form>
+  {% else %}
+  {# ── Agent : lecture seule ── #}
+  <div class="info-box" style="margin-bottom:16px">
+    <svg viewBox="0 0 24 24" width="16" height="16" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    Vos informations sont gérées par l'administrateur. Contactez-le pour toute modification.
+  </div>
+  {% endif %}
 
   <div class="profil-infos">
     <h3>Informations du compte</h3>

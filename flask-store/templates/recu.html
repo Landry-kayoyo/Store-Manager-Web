@@ -27,7 +27,7 @@
   <div class="receipt-wrapper">
     <div class="receipt">
 
-      {# ── En-tête avec logo ───────────────────────────── #}
+      {# ── En-tête ─────────────────────────────────────── #}
       <div class="receipt-header">
         {% if params and params.logo %}
           <div class="receipt-logo-wrap">
@@ -38,17 +38,10 @@
           <div class="receipt-logo-initial">{{ (params.nom_magasin or 'M')[0] }}</div>
         {% endif %}
         <h2 class="receipt-store-name">{{ params.nom_magasin if params else 'Mon Magasin' }}</h2>
-
         {% if params %}
-          {% if params.adresse %}
-            <p class="receipt-contact">{{ params.adresse }}</p>
-          {% endif %}
-          {% if params.telephone %}
-            <p class="receipt-contact">📞 {{ params.telephone }}</p>
-          {% endif %}
-          {% if params.site_web %}
-            <p class="receipt-contact">🌐 {{ params.site_web }}</p>
-          {% endif %}
+          {% if params.adresse %}<p class="receipt-contact">{{ params.adresse }}</p>{% endif %}
+          {% if params.telephone %}<p class="receipt-contact">📞 {{ params.telephone }}</p>{% endif %}
+          {% if params.site_web %}<p class="receipt-contact">🌐 {{ params.site_web }}</p>{% endif %}
         {% endif %}
         <p class="receipt-subtitle">Reçu de vente</p>
       </div>
@@ -65,20 +58,12 @@
         </div>
         <div class="receipt-row">
           <span>Agent</span>
-          <span class="receipt-agent">
-            {% if agent and agent.photo_profil %}
-              <img src="{{ url_for('uploaded_file', filename=agent.photo_profil) }}"
-                   alt="" class="receipt-avatar">
-            {% endif %}
-            {{ agent.nom if agent else 'N/A' }}
-          </span>
+          <span>{{ agent.nom if agent else 'N/A' }}</span>
         </div>
-        {% if vente.multi_devises %}
-        <div class="receipt-row" style="color:var(--text-muted);font-size:.75rem">
-          <span>Taux utilisé</span>
+        <div class="receipt-row" style="font-size:.75rem;color:var(--text-muted)">
+          <span>Taux du jour</span>
           <span>1&nbsp;$ = {{ vente.taux_change_utilise | int }}&nbsp;FC</span>
         </div>
-        {% endif %}
       </div>
 
       <div class="receipt-divider">· · · · · · · · · · · · · · · · · · · ·</div>
@@ -99,7 +84,6 @@
             <td>
               {{ l.nom_produit }}
               {% if l.promo_pct %}<span class="promo-badge">-{{ l.promo_pct | int }}%</span>{% endif %}
-              {# Si le produit était dans une autre devise, afficher le prix d'origine #}
               {% if l.devise_produit and l.devise_produit != vente.devise and l.prix_unitaire_origine %}
                 <br><span style="font-size:.65rem;color:var(--text-muted)">
                   ({{ l.prix_unitaire_origine | round(2) }} {{ l.devise_produit }} converti)
@@ -110,10 +94,8 @@
             <td class="text-right">
               {% if l.promo_pct %}
                 <s class="text-muted" style="font-size:.65rem">{{ format_montant(l.prix_original, vente.devise) }}</s><br>
-                {{ format_montant(l.prix_unitaire, vente.devise) }}
-              {% else %}
-                {{ format_montant(l.prix_unitaire, vente.devise) }}
               {% endif %}
+              {{ format_montant(l.prix_unitaire, vente.devise) }}
             </td>
             <td class="text-right fw-bold">{{ format_montant(l.sous_total, vente.devise) }}</td>
           </tr>
@@ -130,27 +112,39 @@
           <span>Sous-total</span><span>{{ format_montant(sous_total_brut, vente.devise) }}</span>
         </div>
         <div class="receipt-row promo-row">
-          <span>Remise promotionnelle</span><span>- {{ format_montant(remise_total, vente.devise) }}</span>
+          <span>Remise</span><span>- {{ format_montant(remise_total, vente.devise) }}</span>
         </div>
         {% endif %}
+
+        {# Total principal dans la devise de la vente #}
         <div class="receipt-row total-row">
-          <span>TOTAL</span><span>{{ format_montant(vente.total, vente.devise) }}</span>
+          <span>TOTAL</span>
+          <span>{{ format_montant(vente.total, vente.devise) }}</span>
         </div>
-        <div class="receipt-row text-muted" style="font-size:.72rem">
-          <span>Devise</span>
-          <span>{{ vente.devise }}{% if vente.devise == 'FC' %} — 1 $ = {{ vente.taux_change_utilise | int }} FC{% endif %}</span>
+
+        {# Équivalent en USD si la vente est en FC, ou en FC si en USD #}
+        {% if vente.devise == 'FC' %}
+        <div class="receipt-row" style="font-size:.8rem;color:var(--text-muted)">
+          <span>≈ en USD</span>
+          <span>${{ "%.2f"|format(vente.total / vente.taux_change_utilise) }}</span>
         </div>
+        {% else %}
+        <div class="receipt-row" style="font-size:.8rem;color:var(--text-muted)">
+          <span>≈ en FC</span>
+          <span>{{ "{:,.0f}".format(vente.total * vente.taux_change_utilise).replace(",", " ") }} FC</span>
+        </div>
+        {% endif %}
+
         {% if vente.multi_devises %}
         <div class="receipt-row text-muted" style="font-size:.72rem">
           <span></span>
-          <span>⚠ Vente avec conversion multi-devises</span>
+          <span>⚠ Conversion multi-devises incluse</span>
         </div>
         {% endif %}
       </div>
 
       <div class="receipt-divider">· · · · · · · · · · · · · · · · · · · ·</div>
 
-      {# ── Message personnalisé ───────────────────────── #}
       <p class="receipt-thanks">
         {{ params.message_recu if params and params.message_recu else 'Merci pour votre achat !' }}
       </p>
@@ -160,8 +154,6 @@
 
   <script>
     window.onload = function () {
-      // Imprimer automatiquement seulement à la 1ère ouverture depuis la caisse.
-      // sessionStorage empêche le re-déclenchement au rechargement de la page.
       const key = 'recu_printed_{{ vente.id }}';
       const fromHistorique = document.referrer.includes('/historique');
       const fromRecu = document.referrer.includes('/vente/');

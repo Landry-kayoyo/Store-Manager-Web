@@ -432,6 +432,10 @@ def dashboard():
 def profil():
     user = current_user()
     if request.method == 'POST':
+        # Seul l'admin peut modifier son propre profil
+        if session.get('role') != 'admin':
+            flash("Les agents ne peuvent pas modifier leurs informations. Contactez l'administrateur.", 'warning')
+            return redirect(url_for('profil'))
         try:
             file = request.files.get('photo')
             if file and file.filename:
