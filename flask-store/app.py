@@ -159,6 +159,24 @@ def run_migrations():
 
 
 # ──────────────────────────────────────────────────────────
+# Migrations automatiques à la première requête (Flask 3.x)
+# before_first_request n'existe plus → on utilise un flag
+# ──────────────────────────────────────────────────────────
+_migrations_done = False
+
+@app.before_request
+def ensure_migrations():
+    global _migrations_done
+    if not _migrations_done:
+        try:
+            db.create_all()
+            run_migrations()
+        except Exception as exc:
+            app.logger.error(f"ensure_migrations failed: {exc}")
+        _migrations_done = True
+
+
+# ──────────────────────────────────────────────────────────
 # Décorateurs d'authentification
 # ──────────────────────────────────────────────────────────
 def login_required(f):
