@@ -1,45 +1,51 @@
-# [Project name]
+# Gestion de Magasin
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Application web interne de gestion de magasin (matériel informatique, accessoires, etc.) — Flask + SQLite, déployable sur PythonAnywhere.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+```bash
+# 1. Installer les dépendances
+cd flask-store && pip install -r requirements.txt
+
+# 2. Initialiser la base de données (une seule fois)
+python init_db.py
+
+# 3. Lancer l'application
+python app.py
+```
+
+Accès : [http://localhost:5000](http://localhost:5000)  
+Compte admin par défaut : `admin@magasin.com` / `admin123`
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Backend** : Flask 3.0 (Python)
+- **Frontend** : HTML/CSS/JavaScript vanilla + Chart.js (CDN)
+- **Base de données** : SQLite via Flask-SQLAlchemy
+- **Auth** : Sessions Flask + werkzeug.security (hash bcrypt)
+- **Images** : Pillow (redimensionnement auto 300×300)
+- **Structure WSGI** : Compatible PythonAnywhere (`app.py` comme point d'entrée)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `flask-store/app.py` — toutes les routes Flask
+- `flask-store/models.py` — modèles SQLAlchemy (User, Produit, Vente, Promotion, AuditLog, Parametres)
+- `flask-store/templates/` — templates Jinja2
+- `flask-store/static/css/style.css` — palette vert forêt / or, responsive
+- `flask-store/static/js/caisse.js` — logique panier côté client (JSON fetch)
+- `flask-store/static/js/dashboard.js` — graphiques Chart.js via `/api/dashboard-stats`
+- `flask-store/static/uploads/` — photos de profil et logos (gitkeep inclus)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
-
-## Product
-
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Auth manuelle via Flask session (pas Flask-Login) — dépendance minimale
+- Journal d'audit en BDD, non modifiable même par l'admin
+- L'historique des ventes snapshot la devise et le taux au moment de la vente (jamais recalculé)
+- API `/api/dashboard-stats` chargée en AJAX pour ne pas bloquer l'affichage initial
+- Pagination obligatoire (20 items/page) sur toutes les listes
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Stack : Python Flask + SQLite (pour PythonAnywhere)
+- Langue de l'interface : Français

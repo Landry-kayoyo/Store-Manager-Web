@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Stock — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Stock{% endblock %}
+
+{% block topbar_actions %}
+  {% if session.get('role') == 'admin' %}
+  <a href="{{ url_for('produit_nouveau') }}" class="btn btn-accent">+ Ajouter un produit</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header filter-bar">
+    <form method="GET" class="filter-form">
+      <input type="text" name="q" value="{{ search }}" placeholder="Rechercher un produit…" class="input-search">
+      <select name="categorie" class="select-input">
+        <option value="">Toutes les catégories</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}" {% if cat == categorie_filtre %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary">Filtrer</button>
+      {% if search or categorie_filtre %}
+      <a href="{{ url_for('stock') }}" class="btn btn-ghost">Réinitialiser</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Produit</th>
+          <th>Catégorie</th>
+          <th>Prix</th>
+          <th>Stock</th>
+          {% if session.get('role') == 'admin' %}<th>Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in produits.items %}
+        <tr>
+          <td>
+            <div class="product-cell">
+              {% if p.image %}
+                <img src="{{ url_for('uploaded_file', filename=p.image) }}" alt="" class="product-thumb">
+              {% else %}
+                <div class="product-thumb product-thumb-placeholder">{{ p.nom[0] }}</div>
+              {% endif %}
+              <div>
+                <div class="product-name">{{ p.nom }}</div>
+                {% if p.description %}
+                <div class="product-desc text-muted">{{ p.description[:60] }}{% if p.description|length > 60 %}…{% endif %}</div>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-outline">{{ p.categorie }}</span></td>
+          <td class="fw-bold">{{ format_montant(p.prix) }}</td>
+          <td>
+            {% if p.stock == 0 %}
+              <span class="stock-badge stock-zero">Rupture</span>
+            {% elif p.stock < STOCK_BAS_SEUIL %}
+              <span class="stock-badge stock-low">{{ p.stock }} unités ⚠</span>
+            {% else %}
+              <span class="stock-badge stock-ok">{{ p.stock }}</span>
+            {% endif %}
+          </td>
+          {% if session.get('role') == 'admin' %}
+          <td>
+            <div class="action-btns">
+              <a href="{{ url_for('produit_modifier', id=p.id) }}" class="btn btn-sm btn-outline" title="Modifier">Modifier</a>
+              <form method="POST" action="{{ url_for('produit_supprimer', id=p.id) }}"
+                    onsubmit="return confirm('Supprimer « {{ p.nom }} » ? Cette action est irréversible.')">
+                <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+              </form>
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty-row">Aucun produit trouvé.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if produits.pages > 1 %}
+  <div class="pagination">
+    {% if produits.has_prev %}
+      <a href="{{ url_for('stock', page=produits.prev_num, q=search, categorie=categorie_filtre) }}" class="page-btn">‹ Préc.</a>
+    {% endif %}
+    <span class="page-info">Page {{ produits.page }} / {{ produits.pages }}</span>
+    {% if produits.has_next %}
+      <a href="{{ url_for('stock', page=produits.next_num, q=search, categorie=categorie_filtre) }}" class="page-btn">Suiv. ›</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

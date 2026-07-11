@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><title>500 — Erreur serveur</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="error-page">
+<div class="error-container">
+  <div class="error-code">500</div>
+  <h1>Erreur interne</h1>
+  <p>Une erreur inattendue s'est produite. Veuillez réessayer ou contacter l'administrateur.</p>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Retour au tableau de bord</a>
+</div>
+</body></html>

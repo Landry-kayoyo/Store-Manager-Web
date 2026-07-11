@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Modifier l\'agent' if agent else 'Nouvel agent' }} — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}{{ 'Modifier l\'agent' if agent else 'Nouvel agent' }}{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+  <form method="POST" enctype="multipart/form-data">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="nom">Nom complet *</label>
+        <input type="text" id="nom" name="nom" required
+               value="{{ agent.nom if agent else '' }}" placeholder="Prénom Nom">
+      </div>
+
+      <div class="form-group">
+        <label for="email">Adresse e-mail *</label>
+        <input type="email" id="email" name="email" required
+               value="{{ agent.email if agent else '' }}" placeholder="agent@magasin.com">
+      </div>
+
+      <div class="form-group">
+        <label for="mot_de_passe">{{ 'Nouveau mot de passe' if agent else 'Mot de passe *' }}</label>
+        <input type="password" id="mot_de_passe" name="mot_de_passe"
+               {% if not agent %}required{% endif %}
+               placeholder="{{ 'Laisser vide pour conserver' if agent else 'Minimum 6 caractères' }}">
+        {% if agent %}
+        <p class="form-hint">Laisser vide pour conserver le mot de passe actuel.</p>
+        {% endif %}
+      </div>
+
+      {% if agent %}
+      <div class="form-group">
+        <label for="actif">Statut du compte</label>
+        <div class="toggle-row">
+          <input type="checkbox" id="actif" name="actif" class="toggle-checkbox"
+                 {% if agent.actif %}checked{% endif %}>
+          <label for="actif" class="toggle-label">Compte actif</label>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="form-group form-group-full">
+        <label for="photo">Photo de profil</label>
+        {% if agent and agent.photo_profil %}
+          <div class="current-image">
+            <img src="{{ url_for('uploaded_file', filename=agent.photo_profil) }}" alt="" class="preview-img preview-round">
+            <p class="text-muted">Choisissez un nouveau fichier pour remplacer.</p>
+          </div>
+        {% endif %}
+        <input type="file" id="photo" name="photo" accept=".jpg,.jpeg,.png,.webp">
+        <p class="form-hint">JPG ou PNG — redimensionnée à 300×300 px.</p>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a href="{{ url_for('agents') }}" class="btn btn-ghost">Annuler</a>
+      <button type="submit" class="btn btn-primary">
+        {{ 'Enregistrer' if agent else 'Créer l\'agent' }}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

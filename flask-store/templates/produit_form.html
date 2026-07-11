@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Modifier' if produit else 'Nouveau produit' }} — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}{{ 'Modifier le produit' if produit else 'Nouveau produit' }}{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+  <form method="POST" enctype="multipart/form-data">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="nom">Nom du produit *</label>
+        <input type="text" id="nom" name="nom" required value="{{ produit.nom if produit else '' }}"
+               placeholder="ex : Clavier mécanique sans fil">
+      </div>
+
+      <div class="form-group">
+        <label for="categorie">Catégorie *</label>
+        <div class="input-combo">
+          <input type="text" id="categorie" name="categorie" required list="cat-list"
+                 value="{{ produit.categorie if produit else '' }}"
+                 placeholder="ex : Informatique">
+          <datalist id="cat-list">
+            {% for cat in categories %}
+            <option value="{{ cat }}">
+            {% endfor %}
+          </datalist>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="prix">Prix ({{ params.devise_active if params else 'FC' }}) *</label>
+        <input type="number" id="prix" name="prix" required step="0.01" min="0"
+               value="{{ produit.prix if produit else '' }}" placeholder="0.00">
+      </div>
+
+      <div class="form-group">
+        <label for="stock">Quantité en stock *</label>
+        <input type="number" id="stock" name="stock" required step="1" min="0"
+               value="{{ produit.stock if produit else '0' }}">
+      </div>
+
+      <div class="form-group form-group-full">
+        <label for="description">Description (optionnel)</label>
+        <textarea id="description" name="description" rows="3"
+                  placeholder="Description courte du produit…">{{ produit.description if produit else '' }}</textarea>
+      </div>
+
+      <div class="form-group form-group-full">
+        <label for="image">Image du produit</label>
+        {% if produit and produit.image %}
+          <div class="current-image">
+            <img src="{{ url_for('uploaded_file', filename=produit.image) }}" alt="Image actuelle" class="preview-img">
+            <p class="text-muted">Image actuelle — choisissez un nouveau fichier pour la remplacer.</p>
+          </div>
+        {% endif %}
+        <input type="file" id="image" name="image" accept=".jpg,.jpeg,.png,.webp">
+        <p class="form-hint">JPG ou PNG, max 5 Mo — redimensionnée à 300×300 px.</p>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a href="{{ url_for('stock') }}" class="btn btn-ghost">Annuler</a>
+      <button type="submit" class="btn btn-primary">
+        {{ 'Enregistrer les modifications' if produit else 'Ajouter le produit' }}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

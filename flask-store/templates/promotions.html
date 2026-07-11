@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% block title %}Promotions — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Promotions{% endblock %}
+
+{% block content %}
+<div class="two-col-layout">
+  <!-- Formulaire -->
+  <div class="card form-card">
+    <div class="card-header"><h3>Créer une promotion</h3></div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-group">
+          <label>Type de promotion</label>
+          <div class="radio-tabs" id="promo-type-tabs">
+            <label class="radio-tab">
+              <input type="radio" name="promo_type" value="produit" checked onchange="switchPromoType('produit')">
+              Produit spécifique
+            </label>
+            <label class="radio-tab">
+              <input type="radio" name="promo_type" value="categorie" onchange="switchPromoType('categorie')">
+              Catégorie entière
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="grp-produit">
+          <label for="produit_id">Produit</label>
+          <select id="produit_id" name="produit_id" class="select-input">
+            <option value="">— Sélectionner —</option>
+            {% for p in produits %}
+            <option value="{{ p.id }}">{{ p.nom }} ({{ p.categorie }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group" id="grp-categorie" style="display:none">
+          <label for="categorie">Catégorie</label>
+          <select id="categorie" name="categorie" class="select-input">
+            <option value="">— Sélectionner —</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}">{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="pourcentage">Réduction (%)</label>
+          <input type="number" id="pourcentage" name="pourcentage" min="1" max="99" step="0.1"
+                 required placeholder="ex : 15">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="date_debut">Date de début</label>
+            <input type="date" id="date_debut" name="date_debut" required>
+          </div>
+          <div class="form-group">
+            <label for="date_fin">Date de fin</label>
+            <input type="date" id="date_fin" name="date_fin" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Créer la promotion</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Liste -->
+  <div class="promo-lists">
+    {% if actives %}
+    <div class="card">
+      <div class="card-header"><h3>En cours <span class="badge badge-success">{{ actives|length }}</span></h3></div>
+      <div class="card-body">
+        {% for p in actives %}
+        <div class="promo-item promo-active">
+          <div class="promo-info">
+            <span class="promo-pct">-{{ p.pourcentage | int }}%</span>
+            <div>
+              {% if p.produit_id and p.produit %}<strong>{{ p.produit.nom }}</strong>
+              {% elif p.categorie %}<strong>Catégorie : {{ p.categorie }}</strong>
+              {% else %}<strong>Promotion générale</strong>{% endif %}
+              <div class="text-muted">{{ p.date_debut.strftime('%d/%m/%Y') }} → {{ p.date_fin.strftime('%d/%m/%Y') }}</div>
+            </div>
+          </div>
+          <form method="POST" action="{{ url_for('promotion_supprimer', id=p.id) }}"
+                onsubmit="return confirm('Supprimer cette promotion ?')">
+            <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if a_venir %}
+    <div class="card">
+      <div class="card-header"><h3>À venir <span class="badge badge-outline">{{ a_venir|length }}</span></h3></div>
+      <div class="card-body">
+        {% for p in a_venir %}
+        <div class="promo-item">
+          <div class="promo-info">
+            <span class="promo-pct promo-pct-muted">-{{ p.pourcentage | int }}%</span>
+            <div>
+              {% if p.produit_id and p.produit %}<strong>{{ p.produit.nom }}</strong>
+              {% elif p.categorie %}<strong>Catégorie : {{ p.categorie }}</strong>{% endif %}
+              <div class="text-muted">Début le {{ p.date_debut.strftime('%d/%m/%Y') }}</div>
+            </div>
+          </div>
+          <form method="POST" action="{{ url_for('promotion_supprimer', id=p.id) }}"
+                onsubmit="return confirm('Supprimer cette promotion ?')">
+            <button type="submit" class="btn btn-sm btn-ghost">Annuler</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if expirees %}
+    <div class="card">
+      <div class="card-header"><h3>Expirées</h3></div>
+      <div class="card-body">
+        {% for p in expirees[:10] %}
+        <div class="promo-item promo-expired">
+          <div class="promo-info">
+            <span class="promo-pct promo-pct-muted">-{{ p.pourcentage | int }}%</span>
+            <div>
+              {% if p.produit_id and p.produit %}<strong>{{ p.produit.nom }}</strong>
+              {% elif p.categorie %}<strong>Catégorie : {{ p.categorie }}</strong>{% endif %}
+              <div class="text-muted">Expiré le {{ p.date_fin.strftime('%d/%m/%Y') }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not actives and not a_venir and not expirees %}
+    <div class="card"><div class="card-body empty-state">Aucune promotion créée.</div></div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function switchPromoType(type) {
+  document.getElementById('grp-produit').style.display = type === 'produit' ? '' : 'none';
+  document.getElementById('grp-categorie').style.display = type === 'categorie' ? '' : 'none';
+}
+</script>
+{% endblock %}

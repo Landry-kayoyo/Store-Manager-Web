@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Statistiques — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Statistiques{% endblock %}
+
+{% block content %}
+<div id="stats-loading" class="loading-overlay">
+  <div class="spinner"></div><p>Chargement des données…</p>
+</div>
+
+<div class="kpi-grid" id="kpi-grid">
+  <div class="kpi-card loading"><div class="kpi-label">CA aujourd'hui</div><div class="kpi-value" id="s-ca-jour">—</div></div>
+  <div class="kpi-card loading"><div class="kpi-label">Ventes aujourd'hui</div><div class="kpi-value" id="s-nb-jour">—</div></div>
+  <div class="kpi-card loading kpi-warning"><div class="kpi-label">Produits stock bas</div><div class="kpi-value" id="s-stock-bas">—</div></div>
+  <div class="kpi-card loading"><div class="kpi-label">Agents actifs</div><div class="kpi-value" id="s-agents">—</div></div>
+</div>
+
+<div class="dashboard-grid">
+  <div class="card chart-card">
+    <div class="card-header"><h3>Évolution des ventes — 7 jours</h3></div>
+    <div class="card-body"><canvas id="chartVentes" height="100"></canvas></div>
+  </div>
+  <div class="card chart-card">
+    <div class="card-header"><h3>Répartition par catégorie (30 jours)</h3></div>
+    <div class="card-body"><canvas id="chartCategories" height="130"></canvas></div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <div class="card">
+    <div class="card-header"><h3>Top agents — 30 jours</h3></div>
+    <div class="card-body" id="top-agents-container">
+      <div class="skeleton-list"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>Stock critique</h3><a href="{{ url_for('stock') }}" class="link-sm">Gérer →</a></div>
+    <div class="card-body" id="stock-bas-container">
+      <div class="skeleton-list"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Agents — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Gestion des agents{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('agent_nouveau') }}" class="btn btn-accent">+ Nouvel agent</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Agent</th>
+          <th>Email</th>
+          <th>Statut</th>
+          <th>Dernière connexion</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in agents.items %}
+        <tr>
+          <td>
+            <div class="agent-cell">
+              {% if a.photo_profil %}
+                <img src="{{ url_for('uploaded_file', filename=a.photo_profil) }}" alt="" class="avatar-sm">
+              {% else %}
+                <div class="avatar-sm avatar-initial">{{ a.nom[0] }}</div>
+              {% endif %}
+              <span class="fw-bold">{{ a.nom }}</span>
+            </div>
+          </td>
+          <td class="text-muted">{{ a.email }}</td>
+          <td>
+            {% if a.actif %}
+              <span class="badge badge-success">Actif</span>
+            {% else %}
+              <span class="badge badge-danger">Désactivé</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">
+            {% if a.derniere_connexion %}
+              {{ a.derniere_connexion.strftime('%d/%m/%Y %H:%M') }}
+            {% else %}
+              Jamais connecté
+            {% endif %}
+          </td>
+          <td>
+            <div class="action-btns">
+              <a href="{{ url_for('agent_modifier', id=a.id) }}" class="btn btn-sm btn-outline">Modifier</a>
+              <form method="POST" action="{{ url_for('agent_supprimer', id=a.id) }}"
+                    onsubmit="return confirm('Supprimer le compte de {{ a.nom }} ? Ses ventes seront conservées.')">
+                <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty-row">Aucun agent enregistré.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if agents.pages > 1 %}
+  <div class="pagination">
+    {% if agents.has_prev %}
+      <a href="{{ url_for('agents', page=agents.prev_num) }}" class="page-btn">‹ Préc.</a>
+    {% endif %}
+    <span class="page-info">Page {{ agents.page }} / {{ agents.pages }}</span>
+    {% if agents.has_next %}
+      <a href="{{ url_for('agents', page=agents.next_num) }}" class="page-btn">Suiv. ›</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

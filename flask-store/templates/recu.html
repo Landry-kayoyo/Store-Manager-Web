@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reçu {{ vente.numero_recu }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff; }
+      .receipt-wrapper { box-shadow: none; }
+    }
+  </style>
+</head>
+<body class="recu-page">
+  <div class="no-print recu-topbar">
+    <a href="{{ url_for('historique') }}" class="btn btn-ghost">← Retour</a>
+    <button onclick="window.print()" class="btn btn-primary">Imprimer</button>
+  </div>
+
+  <div class="receipt-wrapper">
+    <div class="receipt">
+      <!-- En-tête -->
+      <div class="receipt-header">
+        {% if params and params.logo %}
+          <img src="{{ url_for('uploaded_file', filename=params.logo) }}" alt="Logo" class="receipt-logo">
+        {% endif %}
+        <h2>{{ params.nom_magasin if params else 'Mon Magasin' }}</h2>
+        <p class="receipt-subtitle">Reçu de vente</p>
+      </div>
+
+      <div class="receipt-divider">- - - - - - - - - - - - - - - - - - -</div>
+
+      <!-- Infos -->
+      <div class="receipt-meta">
+        <div class="receipt-row">
+          <span>N° Reçu</span><span>{{ vente.numero_recu }}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Date</span><span>{{ vente.date.strftime('%d/%m/%Y %H:%M') }}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Agent</span>
+          <span class="receipt-agent">
+            {% if agent and agent.photo_profil %}
+              <img src="{{ url_for('uploaded_file', filename=agent.photo_profil) }}" alt="" class="receipt-avatar">
+            {% endif %}
+            {{ agent.nom if agent else 'N/A' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="receipt-divider">- - - - - - - - - - - - - - - - - - -</div>
+
+      <!-- Articles -->
+      <table class="receipt-table">
+        <thead>
+          <tr>
+            <th>Article</th>
+            <th class="text-right">Qté</th>
+            <th class="text-right">P.U.</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in lignes %}
+          <tr>
+            <td>
+              {{ l.nom_produit }}
+              {% if l.promo_pct %}<small class="promo-badge">-{{ l.promo_pct | int }}%</small>{% endif %}
+            </td>
+            <td class="text-right">{{ l.quantite }}</td>
+            <td class="text-right">
+              {% if l.promo_pct %}
+                <s class="text-muted">{{ format_montant(l.prix_original) }}</s><br>
+                {{ format_montant(l.prix_unitaire) }}
+              {% else %}
+                {{ format_montant(l.prix_unitaire) }}
+              {% endif %}
+            </td>
+            <td class="text-right fw-bold">{{ format_montant(l.sous_total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="receipt-divider">- - - - - - - - - - - - - - - - - - -</div>
+
+      <!-- Totaux -->
+      <div class="receipt-totals">
+        <div class="receipt-row">
+          <span>Sous-total</span><span>{{ format_montant(sous_total_brut) }}</span>
+        </div>
+        {% if remise_total > 0.001 %}
+        <div class="receipt-row promo-row">
+          <span>Remise</span><span>- {{ format_montant(remise_total) }}</span>
+        </div>
+        {% endif %}
+        <div class="receipt-row total-row">
+          <span>TOTAL</span><span>{{ format_montant(vente.total) }}</span>
+        </div>
+        <div class="receipt-row text-muted">
+          <span>Devise</span><span>{{ vente.devise }}{% if vente.devise == 'FC' %} (1 $ = {{ vente.taux_change_utilise | int }} FC){% endif %}</span>
+        </div>
+      </div>
+
+      <div class="receipt-divider">- - - - - - - - - - - - - - - - - - -</div>
+      <p class="receipt-thanks">Merci pour votre achat !</p>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      // Impression automatique uniquement au premier chargement direct (pas depuis historique)
+      if (!document.referrer.includes('/historique') && !document.referrer.includes('/vente/')) {
+        window.print();
+      }
+    };
+  </script>
+</body>
+</html>

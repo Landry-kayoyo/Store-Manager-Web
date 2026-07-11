@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><title>404 — Page introuvable</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="error-page">
+<div class="error-container">
+  <div class="error-code">404</div>
+  <h1>Page introuvable</h1>
+  <p>La page que vous cherchez n'existe pas ou a été déplacée.</p>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Retour au tableau de bord</a>
+</div>
+</body></html>

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Mon profil — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Mon profil{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+  <div class="profil-header">
+    {% if user.photo_profil %}
+      <img src="{{ url_for('uploaded_file', filename=user.photo_profil) }}" alt="Photo" class="profil-avatar">
+    {% else %}
+      <div class="profil-avatar avatar-initial">{{ user.nom[0] }}</div>
+    {% endif %}
+    <div>
+      <h2>{{ user.nom }}</h2>
+      <p class="text-muted">{{ user.email }}</p>
+      <span class="badge badge-{{ user.role }}">{{ user.role | capitalize }}</span>
+    </div>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data">
+    <div class="form-group">
+      <label for="photo">Modifier la photo de profil</label>
+      <input type="file" id="photo" name="photo" accept=".jpg,.jpeg,.png,.webp">
+      <p class="form-hint">JPG ou PNG — redimensionnée automatiquement à 300×300 px.</p>
+    </div>
+    {% if user.photo_profil %}
+    <div class="info-box">
+      Votre photo actuelle sera remplacée après confirmation.
+    </div>
+    {% endif %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Mettre à jour la photo</button>
+    </div>
+  </form>
+
+  <div class="profil-infos">
+    <h3>Informations du compte</h3>
+    <table class="table table-simple">
+      <tr><td class="text-muted">Nom</td><td>{{ user.nom }}</td></tr>
+      <tr><td class="text-muted">Email</td><td>{{ user.email }}</td></tr>
+      <tr><td class="text-muted">Rôle</td><td>{{ user.role | capitalize }}</td></tr>
+      <tr>
+        <td class="text-muted">Dernière connexion</td>
+        <td>{{ user.derniere_connexion.strftime('%d/%m/%Y à %H:%M') if user.derniere_connexion else 'N/A' }}</td>
+      </tr>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Tableau de bord — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Tableau de bord{% endblock %}
+
+{% block topbar_actions %}
+  {% if session.get('role') == 'agent' %}
+  <a href="{{ url_for('caisse') }}" class="btn btn-accent">+ Nouvelle vente</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+{% if session.get('role') == 'admin' %}
+<!-- ── VUE ADMIN ───────────────────────────────────────── -->
+<div class="kpi-grid" id="kpi-grid">
+  <div class="kpi-card loading" id="kpi-ca"><div class="kpi-label">CA aujourd'hui</div><div class="kpi-value" id="kpi-ca-val">—</div></div>
+  <div class="kpi-card loading" id="kpi-ventes"><div class="kpi-label">Ventes aujourd'hui</div><div class="kpi-value" id="kpi-ventes-val">—</div></div>
+  <div class="kpi-card loading kpi-warning" id="kpi-stock"><div class="kpi-label">Stock bas</div><div class="kpi-value" id="kpi-stock-val">—</div></div>
+  <div class="kpi-card loading" id="kpi-agents"><div class="kpi-label">Agents actifs</div><div class="kpi-value" id="kpi-agents-val">—</div></div>
+</div>
+
+<div class="dashboard-grid">
+  <div class="card chart-card">
+    <div class="card-header"><h3>Ventes — 7 derniers jours</h3></div>
+    <div class="card-body"><canvas id="chartVentes" height="100"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>Top agents (30 jours)</h3></div>
+    <div class="card-body" id="top-agents-container">
+      <div class="skeleton-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <div class="card">
+    <div class="card-header">
+      <h3>Produits en stock critique</h3>
+      <a href="{{ url_for('stock') }}" class="link-sm">Voir tout</a>
+    </div>
+    <div class="card-body" id="stock-bas-container">
+      <div class="skeleton-list"></div>
+    </div>
+  </div>
+  <div class="card chart-card">
+    <div class="card-header"><h3>Ventes par catégorie (30 jours)</h3></div>
+    <div class="card-body"><canvas id="chartCategories" height="140"></canvas></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
+{% else %}
+<!-- ── VUE AGENT ───────────────────────────────────────── -->
+<div class="agent-welcome">
+  <div class="welcome-card">
+    {% if current_user and current_user.photo_profil %}
+      <img src="{{ url_for('uploaded_file', filename=current_user.photo_profil) }}" alt="" class="welcome-avatar">
+    {% else %}
+      <div class="welcome-avatar avatar-initial">{{ current_user.nom[0] if current_user else 'A' }}</div>
+    {% endif %}
+    <div class="welcome-text">
+      <h2>Bonjour, {{ current_user.nom if current_user else '' }} !</h2>
+      <p>Bienvenue dans votre espace de travail.</p>
+    </div>
+  </div>
+
+  <div class="agent-kpis">
+    <div class="kpi-card">
+      <div class="kpi-label">Ventes aujourd'hui</div>
+      <div class="kpi-value">{{ ventes_jour }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Montant du jour</div>
+      <div class="kpi-value">{{ format_montant(ca_jour) }}</div>
+    </div>
+  </div>
+
+  <div class="agent-actions">
+    <a href="{{ url_for('caisse') }}" class="btn btn-accent btn-lg">
+      <svg viewBox="0 0 24 24" width="20" height="20"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      Nouvelle vente
+    </a>
+    <a href="{{ url_for('historique') }}" class="btn btn-outline">
+      <svg viewBox="0 0 24 24" width="20" height="20"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg>
+      Mon historique
+    </a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Paramètres — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Paramètres du magasin{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+  <form method="POST" enctype="multipart/form-data">
+    <h3 class="section-title">Identité du magasin</h3>
+    <div class="form-grid">
+      <div class="form-group form-group-full">
+        <label for="nom_magasin">Nom du magasin</label>
+        <input type="text" id="nom_magasin" name="nom_magasin"
+               value="{{ params.nom_magasin }}" required placeholder="Mon Magasin">
+        <p class="form-hint">Affiché dans l'en-tête, le dashboard et les reçus.</p>
+      </div>
+
+      <div class="form-group form-group-full">
+        <label for="logo">Logo du magasin</label>
+        {% if params.logo %}
+          <div class="current-image">
+            <img src="{{ url_for('uploaded_file', filename=params.logo) }}" alt="Logo actuel" class="preview-img" style="max-width:120px">
+            <p class="text-muted">Logo actuel — choisissez un nouveau fichier pour le remplacer.</p>
+          </div>
+        {% endif %}
+        <input type="file" id="logo" name="logo" accept=".jpg,.jpeg,.png,.webp">
+        <p class="form-hint">PNG ou JPG recommandé — max 300×300 px après redimensionnement.</p>
+      </div>
+    </div>
+
+    <h3 class="section-title">Devise et taux de change</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="devise_active">Devise active</label>
+        <select id="devise_active" name="devise_active" class="select-input">
+          <option value="FC" {% if params.devise_active == 'FC' %}selected{% endif %}>Franc Congolais (FC)</option>
+          <option value="USD" {% if params.devise_active == 'USD' %}selected{% endif %}>Dollar américain ($)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="taux_change">Taux de change (1 $ = ? FC)</label>
+        <input type="number" id="taux_change" name="taux_change"
+               value="{{ params.taux_change_usd_fc | int }}" min="1" step="1"
+               placeholder="2800">
+        <p class="form-hint">Utilisé comme référence. L'historique garde le taux au moment de chaque vente.</p>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <strong>Note :</strong> Le changement de devise s'applique aux nouvelles ventes uniquement.
+      L'historique conserve la devise et le taux utilisés au moment de chaque transaction.
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Enregistrer les paramètres</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

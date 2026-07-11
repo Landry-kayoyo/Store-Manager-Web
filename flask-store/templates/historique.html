@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}Historique — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Historique des ventes{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header filter-bar">
+    <form method="GET" class="filter-form">
+      <div class="btn-group periode-group">
+        <a href="?periode=jour{% if agent_id_filtre %}&agent_id={{ agent_id_filtre }}{% endif %}" class="btn btn-sm {% if periode == 'jour' %}btn-primary{% else %}btn-ghost{% endif %}">Aujourd'hui</a>
+        <a href="?periode=semaine{% if agent_id_filtre %}&agent_id={{ agent_id_filtre }}{% endif %}" class="btn btn-sm {% if periode == 'semaine' %}btn-primary{% else %}btn-ghost{% endif %}">Cette semaine</a>
+        <a href="?periode=mois{% if agent_id_filtre %}&agent_id={{ agent_id_filtre }}{% endif %}" class="btn btn-sm {% if periode == 'mois' %}btn-primary{% else %}btn-ghost{% endif %}">Ce mois</a>
+      </div>
+      {% if session.get('role') == 'admin' %}
+      <select name="agent_id" onchange="this.form.submit()" class="select-input">
+        <option value="">Tous les agents</option>
+        {% for a in agents %}
+        <option value="{{ a.id }}" {% if a.id == agent_id_filtre %}selected{% endif %}>{{ a.nom }}</option>
+        {% endfor %}
+      </select>
+      <input type="hidden" name="periode" value="{{ periode }}">
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>N° Reçu</th>
+          <th>Date</th>
+          {% if session.get('role') == 'admin' %}<th>Agent</th>{% endif %}
+          <th>Articles</th>
+          <th>Devise</th>
+          <th>Total</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in ventes.items %}
+        <tr>
+          <td class="mono">{{ v.numero_recu }}</td>
+          <td>{{ v.date.strftime('%d/%m/%Y %H:%M') }}</td>
+          {% if session.get('role') == 'admin' %}
+          <td>
+            {% set ag = v.agent %}
+            {% if ag %}
+              <div class="agent-cell">
+                {% if ag.photo_profil %}
+                  <img src="{{ url_for('uploaded_file', filename=ag.photo_profil) }}" alt="" class="avatar-xs">
+                {% else %}
+                  <div class="avatar-xs avatar-initial">{{ ag.nom[0] }}</div>
+                {% endif %}
+                {{ ag.nom }}
+              </div>
+            {% else %}N/A{% endif %}
+          </td>
+          {% endif %}
+          <td>{{ v.lignes.count() }}</td>
+          <td><span class="badge badge-outline">{{ v.devise }}</span></td>
+          <td class="fw-bold">{{ format_montant(v.total, v.devise) }}</td>
+          <td>
+            <a href="{{ url_for('recu', id=v.id) }}" class="btn btn-sm btn-outline" target="_blank">Voir reçu</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty-row">Aucune vente sur cette période.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if ventes.pages > 1 %}
+  <div class="pagination">
+    {% if ventes.has_prev %}
+      <a href="{{ url_for('historique', page=ventes.prev_num, periode=periode, agent_id=agent_id_filtre) }}" class="page-btn">‹ Préc.</a>
+    {% endif %}
+    <span class="page-info">Page {{ ventes.page }} / {{ ventes.pages }}</span>
+    {% if ventes.has_next %}
+      <a href="{{ url_for('historique', page=ventes.next_num, periode=periode, agent_id=agent_id_filtre) }}" class="page-btn">Suiv. ›</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
