@@ -4,7 +4,7 @@ Crée les tables, ajoute les nouvelles colonnes si nécessaire,
 un compte admin par défaut, et les paramètres initiaux.
 Utilisation : python init_db.py
 """
-from app import app
+from app import app, run_migrations
 from models import db, User, Parametres
 from werkzeug.security import generate_password_hash
 from sqlalchemy import text, inspect
@@ -42,6 +42,9 @@ def migrate_db():
                 conn.execute(text("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR(45)"))
                 conn.commit()
             print("  ✓ Colonne 'audit_logs.ip_address' ajoutée.")
+
+    # ── Migrations v2 : devises par produit ─────────────────
+    run_migrations()
 
 
 def init_database():
@@ -85,7 +88,6 @@ def init_database():
             db.session.add(params)
             print("✓ Paramètres par défaut créés.")
         else:
-            # S'assurer que les nouvelles colonnes ont des valeurs par défaut sensées
             if not params.message_recu:
                 params.message_recu = 'Merci pour votre achat !'
             if not params.seuil_stock_bas:

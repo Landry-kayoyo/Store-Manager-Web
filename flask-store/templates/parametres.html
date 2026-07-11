@@ -75,27 +75,47 @@
       </div>
     </div>
 
-    {# ── Devise ─────────────────────────────────────────── #}
-    <h3 class="section-title">Devise et taux de change</h3>
+    {# ── Devise & Taux ──────────────────────────────────── #}
+    <h3 class="section-title">Devise de la caisse &amp; taux de change</h3>
     <div class="form-grid">
       <div class="form-group">
-        <label for="devise_active">Devise active</label>
+        <label for="devise_active">Devise de la caisse</label>
         <select id="devise_active" name="devise_active" class="select-input">
-          <option value="FC" {% if params.devise_active == 'FC' %}selected{% endif %}>Franc Congolais (FC)</option>
+          <option value="FC"  {% if params.devise_active == 'FC'  %}selected{% endif %}>Franc Congolais (FC)</option>
           <option value="USD" {% if params.devise_active == 'USD' %}selected{% endif %}>Dollar américain ($)</option>
         </select>
+        <p class="form-hint">
+          Devise dans laquelle les totaux de la caisse sont calculés et affichés.
+          Les produits peuvent avoir leur propre devise (FC ou USD) — la conversion
+          se fait automatiquement au taux ci-dessous.
+        </p>
       </div>
       <div class="form-group">
-        <label for="taux_change">Taux de change (1 $ = ? FC)</label>
-        <input type="number" id="taux_change" name="taux_change"
-               value="{{ params.taux_change_usd_fc | int }}" min="1" step="1"
-               placeholder="2800">
-        <p class="form-hint">L'historique garde le taux au moment de chaque vente.</p>
+        <label for="taux_change">Taux de change officiel (1&nbsp;$&nbsp;=&nbsp;?&nbsp;FC)</label>
+        <div class="input-with-suffix">
+          <input type="number" id="taux_change" name="taux_change"
+                 value="{{ params.taux_change_usd_fc | int }}" min="1" step="1"
+                 placeholder="2230">
+          <span class="input-suffix">FC / $</span>
+        </div>
+        <p class="form-hint">
+          Exemple : saisissez <strong>2230</strong> si 1&nbsp;$ = 2&nbsp;230&nbsp;FC.
+          Ce taux est appliqué à chaque vente pour convertir les produits en dollars
+          vers la devise de la caisse, et vice-versa. Le taux utilisé est enregistré
+          sur chaque reçu pour traçabilité.
+        </p>
       </div>
     </div>
 
+    <div class="info-box">
+      <strong>Note :</strong> Chaque produit peut être saisi dans sa propre devise (FC ou USD).
+      Lorsqu'un client achète des produits en devises différentes, la caisse convertit
+      automatiquement tout au taux configuré ici. Le changement de devise ou de taux
+      ne modifie pas l'historique des ventes passées.
+    </div>
+
     {# ── Seuils opérationnels ───────────────────────────── #}
-    <h3 class="section-title">Paramètres opérationnels</h3>
+    <h3 class="section-title" style="margin-top:24px">Paramètres opérationnels</h3>
     <div class="form-grid">
       <div class="form-group">
         <label for="seuil_stock_bas">Alerte stock bas (en dessous de)</label>
@@ -115,11 +135,6 @@
         </div>
         <p class="form-hint">Entre 5 et 100 lignes par page.</p>
       </div>
-    </div>
-
-    <div class="info-box">
-      <strong>Note :</strong> Le changement de devise s'applique aux nouvelles ventes uniquement.
-      L'historique conserve la devise et le taux utilisés au moment de chaque transaction.
     </div>
 
     <div class="form-actions">

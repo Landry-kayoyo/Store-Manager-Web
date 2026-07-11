@@ -23,8 +23,14 @@
         <option value="{{ cat }}" {% if cat == categorie_filtre %}selected{% endif %}>{{ cat }}</option>
         {% endfor %}
       </select>
+      <select name="devise" class="select-input" onchange="this.form.submit()">
+        <option value="">Toutes les devises</option>
+        {% for d in DEVISES %}
+        <option value="{{ d }}" {% if d == devise_filtre %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
       <button type="submit" class="btn btn-primary">Filtrer</button>
-      {% if search or categorie_filtre %}
+      {% if search or categorie_filtre or devise_filtre %}
       <a href="{{ url_for('stock') }}" class="btn btn-ghost">Réinitialiser</a>
       {% endif %}
     </form>
@@ -37,6 +43,7 @@
           <th>Produit</th>
           <th>Catégorie</th>
           <th>Prix</th>
+          <th>Devise</th>
           <th>Stock</th>
           {% if session.get('role') == 'admin' %}<th>Actions</th>{% endif %}
         </tr>
@@ -60,7 +67,12 @@
             </div>
           </td>
           <td><span class="badge badge-outline">{{ p.categorie }}</span></td>
-          <td class="fw-bold">{{ format_montant(p.prix) }}</td>
+          <td class="fw-bold">{{ format_montant(p.prix, p.devise) }}</td>
+          <td>
+            <span class="badge {% if p.devise == 'USD' %}badge-usd{% else %}badge-fc{% endif %}">
+              {{ p.devise }}
+            </span>
+          </td>
           <td>
             {% if p.stock == 0 %}
               <span class="stock-badge stock-zero">Rupture</span>
@@ -85,9 +97,9 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="5">
+          <td colspan="6">
             <div class="empty-state-full">
-              {% if search or categorie_filtre %}
+              {% if search or categorie_filtre or devise_filtre %}
                 <svg viewBox="0 0 24 24" width="40" height="40"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <p>Aucun produit ne correspond à votre recherche.</p>
                 <a href="{{ url_for('stock') }}" class="btn btn-sm btn-ghost">Voir tous les produits</a>
@@ -109,11 +121,11 @@
   {% if produits.pages > 1 %}
   <div class="pagination">
     {% if produits.has_prev %}
-      <a href="{{ url_for('stock', page=produits.prev_num, q=search, categorie=categorie_filtre) }}" class="page-btn">‹ Préc.</a>
+      <a href="{{ url_for('stock', page=produits.prev_num, q=search, categorie=categorie_filtre, devise=devise_filtre) }}" class="page-btn">‹ Préc.</a>
     {% endif %}
     <span class="page-info">Page {{ produits.page }} / {{ produits.pages }} — {{ produits.total }} produit(s)</span>
     {% if produits.has_next %}
-      <a href="{{ url_for('stock', page=produits.next_num, q=search, categorie=categorie_filtre) }}" class="page-btn">Suiv. ›</a>
+      <a href="{{ url_for('stock', page=produits.next_num, q=search, categorie=categorie_filtre, devise=devise_filtre) }}" class="page-btn">Suiv. ›</a>
     {% endif %}
   </div>
   {% endif %}

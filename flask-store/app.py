@@ -1,6 +1,7 @@
 """
 Application Flask — Gestion de magasin interne.
 Point d'entrée WSGI compatible PythonAnywhere.
+Supporte les devises mixtes FC/USD par produit, accès concurrent multi-agents (WAL).
 """
 import os
 import io
@@ -20,6 +21,7 @@ from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 # ──────────────────────────────────────────────────────────
 # Configuration
@@ -37,14 +39,17 @@ app.config['SECRET_KEY'] = _secret
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+    'connect_args': {'check_same_thread': False, 'timeout': 20},
+}
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB max
 
 # ── Sécurité des cookies de session ──────────────────────
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# Activer Secure uniquement si SECRET_KEY fournie (= production)
 if os.environ.get('SECRET_KEY'):
     app.config['SESSION_COOKIE_SECURE'] = True
 
@@ -61,11 +66,52 @@ limiter = Limiter(
 )
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+DEVISES = ['FC', 'USD']
 
 from models import db, User, Produit, Vente, LigneVente, Promotion, Parametres, AuditLog
 db.init_app(app)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+
+# ──────────────────────────────────────────────────────────
+# Migration douce : ajouter les nouvelles colonnes si absentes
+# ──────────────────────────────────────────────────────────
+def run_migrations():
+    """Ajoute les colonnes ajoutées sans casser la DB existante."""
+    import sqlite3
+    db_path = os.path.join(BASE_DIR, 'database.db')
+    if not os.path.exists(db_path):
+        return
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    # Produit.devise
+    cur.execute("PRAGMA table_info(produits)")
+    cols = {row[1] for row in cur.fetchall()}
+    if 'devise' not in cols:
+        cur.execute("ALTER TABLE produits ADD COLUMN devise TEXT NOT NULL DEFAULT 'FC'")
+        app.logger.info("Migration : colonne produits.devise ajoutée.")
+
+    # Vente.multi_devises
+    cur.execute("PRAGMA table_info(ventes)")
+    vcols = {row[1] for row in cur.fetchall()}
+    if 'multi_devises' not in vcols:
+        cur.execute("ALTER TABLE ventes ADD COLUMN multi_devises INTEGER NOT NULL DEFAULT 0")
+        app.logger.info("Migration : colonne ventes.multi_devises ajoutée.")
+
+    # LigneVente.devise_produit et prix_unitaire_origine
+    cur.execute("PRAGMA table_info(lignes_vente)")
+    lcols = {row[1] for row in cur.fetchall()}
+    if 'devise_produit' not in lcols:
+        cur.execute("ALTER TABLE lignes_vente ADD COLUMN devise_produit TEXT")
+        app.logger.info("Migration : colonne lignes_vente.devise_produit ajoutée.")
+    if 'prix_unitaire_origine' not in lcols:
+        cur.execute("ALTER TABLE lignes_vente ADD COLUMN prix_unitaire_origine REAL")
+        app.logger.info("Migration : colonne lignes_vente.prix_unitaire_origine ajoutée.")
+
+    conn.commit()
+    conn.close()
 
 
 # ──────────────────────────────────────────────────────────
@@ -107,13 +153,24 @@ def get_params():
 
 
 def format_montant(montant, devise=None):
-    """Formate un montant selon la devise active."""
+    """Formate un montant selon la devise."""
     if devise is None:
         devise = get_params().devise_active
     if devise == 'FC':
         return f"{int(round(montant)):,} FC".replace(',', ' ')
     else:
         return f"${montant:,.2f}"
+
+
+def convertir(montant, de_devise, vers_devise, taux_usd_fc):
+    """Convertit un montant d'une devise à l'autre selon le taux configuré."""
+    if de_devise == vers_devise:
+        return montant
+    if de_devise == 'USD' and vers_devise == 'FC':
+        return round(montant * taux_usd_fc, 4)
+    if de_devise == 'FC' and vers_devise == 'USD':
+        return round(montant / taux_usd_fc, 4)
+    return montant
 
 
 def allowed_file(filename):
@@ -126,11 +183,10 @@ def save_image(file, prefix='img', max_size=(300, 300)):
     import uuid
     if not file or not allowed_file(file.filename):
         return None
-    # Vérification MIME réelle via Pillow (pas juste l'extension)
     file.seek(0)
     try:
         probe = Image.open(file)
-        probe.verify()   # lève une exception si le fichier n'est pas une image valide
+        probe.verify()
     except (UnidentifiedImageError, Exception):
         return None
     file.seek(0)
@@ -149,7 +205,6 @@ def save_image(file, prefix='img', max_size=(300, 300)):
 
 
 def delete_image(filename):
-    """Supprime un fichier image du dossier uploads."""
     if filename:
         try:
             os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -201,7 +256,6 @@ def log_audit(action, detail=None, ancienne_valeur=None, nouvelle_valeur=None):
 
 
 def current_user():
-    """Retourne l'utilisateur connecté ou None."""
     uid = session.get('user_id')
     if uid:
         return User.query.get(uid)
@@ -223,15 +277,9 @@ def inject_globals():
         'current_user': current_user(),
         'format_montant': format_montant,
         'STOCK_BAS_SEUIL': seuil,
+        'DEVISES': DEVISES,
         'now': datetime.utcnow(),
     }
-
-
-# Exposer le token CSRF aux templates JS via balise meta
-@app.after_request
-def set_csrf_cookie(response):
-    # Inclure le token dans les réponses HTML pour permettre aux fetch() JS de l'utiliser
-    return response
 
 
 # ──────────────────────────────────────────────────────────
@@ -265,7 +313,6 @@ def login():
                 flash(f'Bienvenue, {user.nom} !', 'success')
                 return redirect(url_for('dashboard'))
             else:
-                # Journaliser la tentative échouée
                 log_audit('CONNEXION_ECHEC', f"Tentative échouée pour : {email}")
                 try:
                     db.session.commit()
@@ -355,19 +402,23 @@ def stock():
     page = request.args.get('page', 1, type=int)
     search = request.args.get('q', '').strip()
     categorie = request.args.get('categorie', '').strip()
+    devise_filtre = request.args.get('devise', '').strip()
 
     query = Produit.query
     if search:
         query = query.filter(Produit.nom.ilike(f'%{search}%'))
     if categorie:
         query = query.filter(Produit.categorie == categorie)
-    query = query.order_by(Produit.nom)
+    if devise_filtre in DEVISES:
+        query = query.filter(Produit.devise == devise_filtre)
+    query = query.order_by(Produit.categorie, Produit.nom)
 
     produits = query.paginate(page=page, per_page=params.pagination or 20, error_out=False)
     categories = db.session.query(Produit.categorie).distinct().order_by(Produit.categorie).all()
     categories = [c[0] for c in categories]
     return render_template('stock.html', produits=produits, categories=categories,
-                           search=search, categorie_filtre=categorie)
+                           search=search, categorie_filtre=categorie,
+                           devise_filtre=devise_filtre)
 
 
 @app.route('/produit/nouveau', methods=['GET', 'POST'])
@@ -379,11 +430,14 @@ def produit_nouveau():
             categorie = request.form.get('categorie', '').strip()
             prix_str = request.form.get('prix', '0').strip()
             stock_str = request.form.get('stock', '0').strip()
+            devise = request.form.get('devise', 'FC').strip()
             description = request.form.get('description', '').strip()
 
             if not nom or not categorie:
                 flash('Le nom et la catégorie sont obligatoires.', 'danger')
                 return redirect(request.url)
+            if devise not in DEVISES:
+                devise = 'FC'
             prix = float(prix_str)
             stock_qty = int(stock_str)
             if prix < 0 or stock_qty < 0:
@@ -393,12 +447,12 @@ def produit_nouveau():
             file = request.files.get('image')
             image_filename = save_image(file, prefix='prod', max_size=(400, 400)) if file and file.filename else None
 
-            p = Produit(nom=nom, categorie=categorie, prix=prix,
+            p = Produit(nom=nom, categorie=categorie, prix=prix, devise=devise,
                         stock=stock_qty, description=description, image=image_filename)
             db.session.add(p)
             db.session.flush()
             log_audit('AJOUT_PRODUIT', f"Produit ajouté : {nom}",
-                      nouvelle_valeur=f"nom={nom}, cat={categorie}, prix={prix}, stock={stock_qty}")
+                      nouvelle_valeur=f"nom={nom}, cat={categorie}, prix={prix} {devise}, stock={stock_qty}")
             db.session.commit()
             flash(f'Produit "{nom}" ajouté avec succès.', 'success')
             return redirect(url_for('stock'))
@@ -407,6 +461,7 @@ def produit_nouveau():
             flash('Valeurs numériques invalides (prix ou stock).', 'danger')
         except Exception as e:
             db.session.rollback()
+            app.logger.error(f"produit_nouveau: {e}")
             flash("Erreur lors de l'ajout du produit.", 'danger')
     categories = db.session.query(Produit.categorie).distinct().order_by(Produit.categorie).all()
     categories = [c[0] for c in categories]
@@ -419,17 +474,21 @@ def produit_modifier(id):
     produit = Produit.query.get_or_404(id)
     if request.method == 'POST':
         try:
-            old_vals = f"nom={produit.nom}, prix={produit.prix}, stock={produit.stock}"
+            old_vals = f"nom={produit.nom}, prix={produit.prix} {produit.devise}, stock={produit.stock}"
             nom = request.form.get('nom', produit.nom).strip()
             cat = request.form.get('categorie', produit.categorie).strip()
             prix = float(request.form.get('prix', produit.prix))
+            devise = request.form.get('devise', produit.devise).strip()
             stock_qty = int(request.form.get('stock', produit.stock))
             if prix < 0 or stock_qty < 0:
                 flash('Le prix et le stock ne peuvent pas être négatifs.', 'danger')
                 return redirect(request.url)
+            if devise not in DEVISES:
+                devise = produit.devise
             produit.nom = nom
             produit.categorie = cat
             produit.prix = prix
+            produit.devise = devise
             produit.stock = stock_qty
             produit.description = request.form.get('description', produit.description or '').strip()
             file = request.files.get('image')
@@ -441,7 +500,7 @@ def produit_modifier(id):
                     produit.image = new_img
                 else:
                     flash('Image invalide ou format non autorisé — image non modifiée.', 'warning')
-            new_vals = f"nom={produit.nom}, prix={produit.prix}, stock={produit.stock}"
+            new_vals = f"nom={produit.nom}, prix={produit.prix} {produit.devise}, stock={produit.stock}"
             log_audit('MODIF_PRODUIT', f"Produit modifié : {produit.nom}",
                       ancienne_valeur=old_vals, nouvelle_valeur=new_vals)
             db.session.commit()
@@ -484,26 +543,35 @@ def produit_supprimer(id):
 @app.route('/caisse')
 @login_required
 def caisse():
+    params = get_params()
     produits = Produit.query.order_by(Produit.categorie, Produit.nom).all()
     promos_data = []
     for p in produits:
         pct = get_active_promos(p.id, p.categorie)
+        # Prix affiché dans la devise d'origine du produit
+        prix_avec_promo = round(p.prix * (1 - pct / 100), 2) if pct else p.prix
+        # Prix converti dans la devise active de la caisse (pour le calcul du total)
+        prix_converti = convertir(prix_avec_promo, p.devise, params.devise_active,
+                                  params.taux_change_usd_fc)
         promos_data.append({
             'id': p.id,
             'nom': p.nom,
             'categorie': p.categorie,
-            'prix': p.prix,
+            'prix': p.prix,                        # prix brut dans la devise produit
+            'devise': p.devise,                    # devise du prix affiché
             'stock': p.stock,
             'promo_pct': pct,
-            'prix_final': round(p.prix * (1 - pct / 100), 2) if pct else p.prix,
+            'prix_final': prix_avec_promo,         # prix après promo (devise produit)
+            'prix_final_converti': prix_converti,  # prix converti dans la devise active caisse
         })
-    params = get_params()
-    return render_template('caisse.html', produits_json=json.dumps(promos_data), params=params)
+    return render_template('caisse.html',
+                           produits_json=json.dumps(promos_data),
+                           params=params)
 
 
 @app.route('/caisse', methods=['POST'])
 @login_required
-@csrf.exempt   # JSON fetch — le token est passé via l'en-tête X-CSRFToken par caisse.js
+@csrf.exempt   # JSON fetch — token envoyé via X-CSRFToken
 def caisse_valider():
     # Vérification manuelle du token CSRF
     token = request.headers.get('X-CSRFToken', '')
@@ -522,6 +590,7 @@ def caisse_valider():
         params = get_params()
         total = 0.0
         lignes_obj = []
+        devises_utilisees = set()
 
         for item in lignes_data:
             produit = Produit.query.get(int(item['produit_id']))
@@ -531,23 +600,45 @@ def caisse_valider():
             if qty <= 0:
                 return jsonify({'error': 'Quantité invalide.'}), 400
             if produit.stock < qty:
-                return jsonify({'error': f'Stock insuffisant pour "{produit.nom}" (disponible : {produit.stock}).'}), 400
+                return jsonify({
+                    'error': f'Stock insuffisant pour "{produit.nom}" (disponible : {produit.stock}).'
+                }), 400
 
+            # Calcul du prix après promo dans la devise du produit
             pct = get_active_promos(produit.id, produit.categorie)
-            prix_final = round(produit.prix * (1 - pct / 100), 4) if pct else produit.prix
-            sous_total = round(prix_final * qty, 4)
+            prix_apres_promo = round(produit.prix * (1 - pct / 100), 4) if pct else produit.prix
+            prix_original_promo = produit.prix if pct else None
+
+            # Conversion vers la devise active de la caisse
+            prix_converti = convertir(prix_apres_promo, produit.devise,
+                                      params.devise_active, params.taux_change_usd_fc)
+            prix_original_converti = (
+                convertir(prix_original_promo, produit.devise,
+                          params.devise_active, params.taux_change_usd_fc)
+                if prix_original_promo else None
+            )
+
+            sous_total = round(prix_converti * qty, 4)
             total += sous_total
+            devises_utilisees.add(produit.devise)
 
             lignes_obj.append(LigneVente(
                 produit_id=produit.id,
                 nom_produit=produit.nom,
                 quantite=qty,
-                prix_unitaire=prix_final,
-                prix_original=produit.prix if pct else None,
+                prix_unitaire=prix_converti,            # dans la devise de la vente
+                prix_original=prix_original_converti,   # dans la devise de la vente
                 promo_pct=pct if pct else None,
                 sous_total=sous_total,
+                devise_produit=produit.devise,
+                prix_unitaire_origine=prix_apres_promo, # dans la devise du produit
             ))
             produit.stock -= qty
+
+        multi_devises = len(devises_utilisees) > 1 or (
+            len(devises_utilisees) == 1 and
+            list(devises_utilisees)[0] != params.devise_active
+        )
 
         numero = generate_numero_recu()
         vente = Vente(
@@ -556,6 +647,7 @@ def caisse_valider():
             devise=params.devise_active,
             taux_change_utilise=params.taux_change_usd_fc,
             numero_recu=numero,
+            multi_devises=multi_devises,
         )
         db.session.add(vente)
         db.session.flush()
@@ -563,11 +655,13 @@ def caisse_valider():
             l.vente_id = vente.id
             db.session.add(l)
 
-        log_audit('VENTE', f"Vente {numero} — Total {total:.2f} {params.devise_active}")
+        log_audit('VENTE', f"Vente {numero} — Total {total:.4f} {params.devise_active}"
+                  + (' [multi-devises]' if multi_devises else ''))
         db.session.commit()
         return jsonify({'success': True, 'recu_url': url_for('recu', id=vente.id)})
     except Exception as e:
         db.session.rollback()
+        app.logger.error(f"caisse_valider: {e}")
         return jsonify({'error': f'Erreur lors de la validation : {str(e)}'}), 500
 
 
@@ -682,7 +776,6 @@ def agent_modifier(id):
             old_vals = f"nom={agent.nom}, email={agent.email}, actif={agent.actif}"
             agent.nom = request.form.get('nom', agent.nom).strip()
             new_email = request.form.get('email', agent.email).strip().lower()
-            # Vérifier unicité si l'email change
             if new_email != agent.email and User.query.filter_by(email=new_email).first():
                 flash('Cet email est déjà utilisé par un autre compte.', 'danger')
                 return render_template('agent_form.html', agent=agent)
@@ -784,7 +877,8 @@ def api_dashboard_stats():
         stock_bas = Produit.query.filter(
             Produit.stock < seuil, Produit.stock >= 0
         ).order_by(Produit.stock).limit(10).all()
-        stock_bas_list = [{'id': p.id, 'nom': p.nom, 'stock': p.stock} for p in stock_bas]
+        stock_bas_list = [{'id': p.id, 'nom': p.nom, 'stock': p.stock,
+                           'devise': p.devise} for p in stock_bas]
 
         cat_ventes_q = db.session.query(
             Produit.categorie,
@@ -806,6 +900,7 @@ def api_dashboard_stats():
             'stock_bas': stock_bas_list,
             'ventes_cat': ventes_cat,
             'devise': params.devise_active,
+            'taux': params.taux_change_usd_fc,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -902,7 +997,15 @@ def parametres():
 
             params.nom_magasin = request.form.get('nom_magasin', params.nom_magasin).strip() or params.nom_magasin
             params.devise_active = request.form.get('devise_active', params.devise_active)
-            params.taux_change_usd_fc = float(request.form.get('taux_change', params.taux_change_usd_fc))
+            if params.devise_active not in DEVISES:
+                params.devise_active = 'FC'
+
+            taux_raw = request.form.get('taux_change', str(params.taux_change_usd_fc)).strip()
+            taux_val = float(taux_raw)
+            if taux_val <= 0:
+                raise ValueError("Le taux doit être positif.")
+            params.taux_change_usd_fc = taux_val
+
             params.adresse = request.form.get('adresse', '').strip() or None
             params.telephone = request.form.get('telephone', '').strip() or None
             params.site_web = request.form.get('site_web', '').strip() or None
@@ -912,7 +1015,6 @@ def parametres():
             params.seuil_stock_bas = max(1, int(seuil_raw)) if seuil_raw.isdigit() else 5
             params.pagination = max(5, min(100, int(pagi_raw))) if pagi_raw.isdigit() else 20
 
-            # Logo — résolution plus grande pour conserver les détails
             file = request.files.get('logo')
             if file and file.filename:
                 new_logo = save_image(file, prefix='logo', max_size=(600, 300))
@@ -935,9 +1037,9 @@ def parametres():
             db.session.commit()
             flash('Paramètres mis à jour.', 'success')
             return redirect(url_for('parametres'))
-        except ValueError:
+        except ValueError as e:
             db.session.rollback()
-            flash('Valeur numérique invalide (taux de change, seuil ou pagination).', 'danger')
+            flash(f'Valeur invalide : {e}', 'danger')
         except Exception:
             db.session.rollback()
             flash('Erreur lors de la mise à jour.', 'danger')
@@ -987,7 +1089,6 @@ def audit():
 @app.route('/audit/export.csv')
 @admin_required
 def audit_export_csv():
-    """Export du journal d'audit en CSV."""
     user_filtre = request.args.get('user_id', type=int)
     action_filtre = request.args.get('action', '').strip()
     periode = request.args.get('periode', '30j')
@@ -1028,7 +1129,7 @@ def audit_export_csv():
 
     filename = f"audit_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.csv"
     return Response(
-        '\ufeff' + output.getvalue(),   # BOM UTF-8 pour Excel
+        '\ufeff' + output.getvalue(),
         mimetype='text/csv; charset=utf-8',
         headers={'Content-Disposition': f'attachment; filename={filename}'}
     )
@@ -1037,7 +1138,6 @@ def audit_export_csv():
 @app.route('/historique/export.csv')
 @admin_required
 def historique_export_csv():
-    """Export de l'historique des ventes en CSV."""
     periode = request.args.get('periode', 'mois')
     agent_id_filtre = request.args.get('agent_id', type=int)
 
@@ -1057,17 +1157,23 @@ def historique_export_csv():
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['N° Reçu', 'Date', 'Agent', 'Total', 'Devise', 'Articles'])
+    writer.writerow(['N° Reçu', 'Date', 'Agent', 'Total', 'Devise', 'Taux 1$=FC', 'Multi-devises', 'Articles'])
     for v in ventes:
         agent = User.query.get(v.agent_id)
         lignes = v.lignes.all()
-        articles = '; '.join(f"{l.nom_produit} x{l.quantite}" for l in lignes)
+        articles = '; '.join(
+            f"{l.nom_produit} x{l.quantite}"
+            + (f" [{l.devise_produit}]" if l.devise_produit else "")
+            for l in lignes
+        )
         writer.writerow([
             v.numero_recu,
             v.date.strftime('%Y-%m-%d %H:%M'),
             agent.nom if agent else 'N/A',
-            f"{v.total:.2f}",
+            f"{v.total:.4f}",
             v.devise,
+            f"{v.taux_change_utilise:.0f}",
+            'Oui' if v.multi_devises else 'Non',
             articles,
         ])
 
@@ -1084,7 +1190,6 @@ def historique_export_csv():
 # ──────────────────────────────────────────────────────────
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
-    # Sécurité : uniquement les noms de fichiers simples (pas de traversée de répertoire)
     filename = os.path.basename(filename)
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
@@ -1104,7 +1209,7 @@ def not_found(e):
 
 @app.errorhandler(429)
 def too_many_requests(e):
-    flash('Trop de tentatives. Veuillez patienter une minute avant de réessayer.', 'danger')
+    flash('Trop de tentatives. Veuillez patienter avant de réessayer.', 'danger')
     return redirect(url_for('login'))
 
 
@@ -1120,4 +1225,5 @@ def internal_error(e):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        run_migrations()
     app.run(debug=True)

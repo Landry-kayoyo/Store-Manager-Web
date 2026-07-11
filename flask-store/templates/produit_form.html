@@ -7,9 +7,11 @@
   <form method="POST" enctype="multipart/form-data">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-grid">
+
       <div class="form-group">
         <label for="nom">Nom du produit *</label>
-        <input type="text" id="nom" name="nom" required value="{{ produit.nom if produit else '' }}"
+        <input type="text" id="nom" name="nom" required
+               value="{{ produit.nom if produit else '' }}"
                placeholder="ex : Clavier mécanique sans fil">
       </div>
 
@@ -27,10 +29,27 @@
         </div>
       </div>
 
+      {# ── Prix + Devise côte à côte ─────────────────────── #}
       <div class="form-group">
-        <label for="prix">Prix ({{ params.devise_active if params else 'FC' }}) *</label>
-        <input type="number" id="prix" name="prix" required step="0.01" min="0"
-               value="{{ produit.prix if produit else '' }}" placeholder="0.00">
+        <label for="prix">Prix *</label>
+        <div class="input-with-suffix">
+          <input type="number" id="prix" name="prix" required step="0.01" min="0"
+                 value="{{ produit.prix if produit else '' }}" placeholder="0.00">
+          <select id="devise" name="devise" class="input-suffix-select"
+                  title="Devise du prix saisi">
+            {% for d in DEVISES %}
+            <option value="{{ d }}"
+              {% if produit and produit.devise == d %}selected
+              {% elif not produit and params and params.devise_active == d %}selected
+              {% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <p class="form-hint">
+          Choisissez la devise dans laquelle ce prix est exprimé.
+          La caisse convertira automatiquement selon le taux configuré
+          (1&nbsp;$&nbsp;=&nbsp;{{ params.taux_change_usd_fc | int if params else '...' }}&nbsp;FC).
+        </p>
       </div>
 
       <div class="form-group">
@@ -54,7 +73,7 @@
           </div>
         {% endif %}
         <input type="file" id="image" name="image" accept=".jpg,.jpeg,.png,.webp">
-        <p class="form-hint">JPG ou PNG, max 5 Mo — redimensionnée à 300×300 px.</p>
+        <p class="form-hint">JPG ou PNG, max 5 Mo — redimensionnée à 400×400 px.</p>
       </div>
     </div>
 

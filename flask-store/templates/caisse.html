@@ -42,7 +42,8 @@
         <span>Remise</span><span id="total-remise">—</span>
       </div>
       <div class="total-line total-final">
-        <span>Total</span><span id="total-final">{{ format_montant(0) }}</span>
+        <span>Total ({{ params.devise_active }})</span>
+        <span id="total-final">{{ format_montant(0, params.devise_active) }}</span>
       </div>
       <button class="btn btn-accent btn-full" id="btn-valider" onclick="validerVente()" disabled>
         <svg viewBox="0 0 24 24" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
@@ -63,10 +64,10 @@
 
 {% block scripts %}
 <script>
-  const PRODUITS = {{ produits_json | safe }};
-  const DEVISE   = "{{ params.devise_active }}";
-  const TAUX     = {{ params.taux_change_usd_fc }};
-  const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+  const PRODUITS     = {{ produits_json | safe }};
+  const DEVISE       = "{{ params.devise_active }}";
+  const TAUX         = {{ params.taux_change_usd_fc }};
+  const CSRF_TOKEN   = document.querySelector('meta[name="csrf-token"]').content;
 </script>
 <script src="{{ url_for('static', filename='js/caisse.js') }}"></script>
 {% endblock %}

@@ -39,7 +39,6 @@
         {% endif %}
         <h2 class="receipt-store-name">{{ params.nom_magasin if params else 'Mon Magasin' }}</h2>
 
-        {# Coordonnées sous le nom #}
         {% if params %}
           {% if params.adresse %}
             <p class="receipt-contact">{{ params.adresse }}</p>
@@ -74,6 +73,12 @@
             {{ agent.nom if agent else 'N/A' }}
           </span>
         </div>
+        {% if vente.multi_devises %}
+        <div class="receipt-row" style="color:var(--text-muted);font-size:.75rem">
+          <span>Taux utilisé</span>
+          <span>1&nbsp;$ = {{ vente.taux_change_utilise | int }}&nbsp;FC</span>
+        </div>
+        {% endif %}
       </div>
 
       <div class="receipt-divider">· · · · · · · · · · · · · · · · · · · ·</div>
@@ -94,17 +99,23 @@
             <td>
               {{ l.nom_produit }}
               {% if l.promo_pct %}<span class="promo-badge">-{{ l.promo_pct | int }}%</span>{% endif %}
+              {# Si le produit était dans une autre devise, afficher le prix d'origine #}
+              {% if l.devise_produit and l.devise_produit != vente.devise and l.prix_unitaire_origine %}
+                <br><span style="font-size:.65rem;color:var(--text-muted)">
+                  ({{ l.prix_unitaire_origine | round(2) }} {{ l.devise_produit }} converti)
+                </span>
+              {% endif %}
             </td>
             <td class="text-right">{{ l.quantite }}</td>
             <td class="text-right">
               {% if l.promo_pct %}
-                <s class="text-muted" style="font-size:.65rem">{{ format_montant(l.prix_original) }}</s><br>
-                {{ format_montant(l.prix_unitaire) }}
+                <s class="text-muted" style="font-size:.65rem">{{ format_montant(l.prix_original, vente.devise) }}</s><br>
+                {{ format_montant(l.prix_unitaire, vente.devise) }}
               {% else %}
-                {{ format_montant(l.prix_unitaire) }}
+                {{ format_montant(l.prix_unitaire, vente.devise) }}
               {% endif %}
             </td>
-            <td class="text-right fw-bold">{{ format_montant(l.sous_total) }}</td>
+            <td class="text-right fw-bold">{{ format_montant(l.sous_total, vente.devise) }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -116,19 +127,25 @@
       <div class="receipt-totals">
         {% if remise_total > 0.001 %}
         <div class="receipt-row">
-          <span>Sous-total</span><span>{{ format_montant(sous_total_brut) }}</span>
+          <span>Sous-total</span><span>{{ format_montant(sous_total_brut, vente.devise) }}</span>
         </div>
         <div class="receipt-row promo-row">
-          <span>Remise promotionnelle</span><span>- {{ format_montant(remise_total) }}</span>
+          <span>Remise promotionnelle</span><span>- {{ format_montant(remise_total, vente.devise) }}</span>
         </div>
         {% endif %}
         <div class="receipt-row total-row">
-          <span>TOTAL</span><span>{{ format_montant(vente.total) }}</span>
+          <span>TOTAL</span><span>{{ format_montant(vente.total, vente.devise) }}</span>
         </div>
         <div class="receipt-row text-muted" style="font-size:.72rem">
           <span>Devise</span>
           <span>{{ vente.devise }}{% if vente.devise == 'FC' %} — 1 $ = {{ vente.taux_change_utilise | int }} FC{% endif %}</span>
         </div>
+        {% if vente.multi_devises %}
+        <div class="receipt-row text-muted" style="font-size:.72rem">
+          <span></span>
+          <span>⚠ Vente avec conversion multi-devises</span>
+        </div>
+        {% endif %}
       </div>
 
       <div class="receipt-divider">· · · · · · · · · · · · · · · · · · · ·</div>
@@ -142,9 +159,9 @@
   </div>
 
   <script>
-    window.onload = function() {
-      // Imprimer automatiquement seulement à la première visite (depuis la caisse),
-      // pas en cas de rechargement ni de navigation depuis l'historique.
+    window.onload = function () {
+      // Imprimer automatiquement seulement à la 1ère ouverture depuis la caisse.
+      // sessionStorage empêche le re-déclenchement au rechargement de la page.
       const key = 'recu_printed_{{ vente.id }}';
       const fromHistorique = document.referrer.includes('/historique');
       const fromRecu = document.referrer.includes('/vente/');

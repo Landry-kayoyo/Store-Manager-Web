@@ -4,11 +4,13 @@
 
 {% block content %}
 <div class="two-col-layout">
-  <!-- Formulaire -->
+  <!-- Formulaire de création -->
   <div class="card form-card">
     <div class="card-header"><h3>Créer une promotion</h3></div>
     <div class="card-body">
       <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
         <div class="form-group">
           <label>Type de promotion</label>
           <div class="radio-tabs" id="promo-type-tabs">
@@ -28,7 +30,7 @@
           <select id="produit_id" name="produit_id" class="select-input">
             <option value="">— Sélectionner —</option>
             {% for p in produits %}
-            <option value="{{ p.id }}">{{ p.nom }} ({{ p.categorie }})</option>
+            <option value="{{ p.id }}">{{ p.nom }} ({{ p.categorie }}) — {{ p.prix }} {{ p.devise }}</option>
             {% endfor %}
           </select>
         </div>
@@ -63,7 +65,7 @@
     </div>
   </div>
 
-  <!-- Liste -->
+  <!-- Liste des promotions -->
   <div class="promo-lists">
     {% if actives %}
     <div class="card">
@@ -75,6 +77,7 @@
             <span class="promo-pct">-{{ p.pourcentage | int }}%</span>
             <div>
               {% if p.produit_id and p.produit %}<strong>{{ p.produit.nom }}</strong>
+                <span class="text-muted" style="font-size:.75rem"> — {{ p.produit.devise }}</span>
               {% elif p.categorie %}<strong>Catégorie : {{ p.categorie }}</strong>
               {% else %}<strong>Promotion générale</strong>{% endif %}
               <div class="text-muted">{{ p.date_debut.strftime('%d/%m/%Y') }} → {{ p.date_fin.strftime('%d/%m/%Y') }}</div>
