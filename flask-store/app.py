@@ -87,7 +87,7 @@ else:
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 DEVISES = ['FC', 'USD']
 
-from models import db, User, Produit, Vente, LigneVente, Promotion, Parametres, AuditLog
+from models import db, User, Produit, Vente, LigneVente, Promotion, Parametres, AuditLog, HistoriqueTaux
 db.init_app(app)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -154,6 +154,21 @@ def run_migrations():
         cur.execute("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR(45)")
         app.logger.info("Migration : colonne audit_logs.ip_address ajoutée.")
 
+    # ── HistoriqueTaux (table entière si absente) ────────────
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='historique_taux'")
+    if not cur.fetchone():
+        cur.execute("""
+            CREATE TABLE historique_taux (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                taux       REAL    NOT NULL,
+                date_debut DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                note       VARCHAR(200),
+                user_id    INTEGER REFERENCES users(id)
+            )
+        """)
+        cur.execute("CREATE INDEX ix_historique_taux_date ON historique_taux (date_debut)")
+        app.logger.info("Migration : table historique_taux créée.")
+
     conn.commit()
     conn.close()
 
@@ -185,6 +200,12 @@ def login_required(f):
         if 'user_id' not in session:
             flash('Veuillez vous connecter.', 'warning')
             return redirect(url_for('login'))
+        # Vérification en base à chaque requête — détecte un blocage en temps réel
+        user = User.query.get(session['user_id'])
+        if not user or not user.actif:
+            session.clear()
+            flash("Votre compte a été désactivé par l'administrateur.", 'danger')
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
 
@@ -212,6 +233,15 @@ def get_params():
         db.session.add(p)
         db.session.commit()
     return p
+
+
+def get_taux_actif():
+    """Retourne le taux de change en vigueur (le plus récent de l'historique).
+    Repli sur params.taux_change_usd_fc si l'historique est vide."""
+    ht = HistoriqueTaux.query.order_by(HistoriqueTaux.date_debut.desc()).first()
+    if ht:
+        return ht.taux
+    return get_params().taux_change_usd_fc
 
 
 def format_montant(montant, devise=None):
@@ -409,7 +439,11 @@ def dashboard():
     user = current_user()
     params = get_params()
     if session['role'] == 'admin':
-        return render_template('dashboard.html', user=user, params=params)
+        agents_actifs_count = User.query.filter_by(role='agent', actif=True).count()
+        agents_bloques = User.query.filter_by(role='agent', actif=False).count()
+        return render_template('dashboard.html', user=user, params=params,
+                               agents_actifs_count=agents_actifs_count,
+                               agents_bloques=agents_bloques)
     else:
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         ventes_jour = Vente.query.filter(
@@ -652,8 +686,14 @@ def caisse_valider():
         if not data or not data.get('lignes'):
             return jsonify({'error': 'Panier vide.'}), 400
 
+        # Vérifier que l'agent est toujours actif (peut avoir été bloqué entre-temps)
+        agent = User.query.get(session['user_id'])
+        if not agent or not agent.actif:
+            return jsonify({'error': 'Votre compte a été désactivé. Aucune vente enregistrée.'}), 403
+
         lignes_data = data['lignes']
         params = get_params()
+        taux = get_taux_actif()   # taux en vigueur au moment de la vente
         total = 0.0
         lignes_obj = []
         devises_utilisees = set()
@@ -675,12 +715,12 @@ def caisse_valider():
             prix_apres_promo = round(produit.prix * (1 - pct / 100), 4) if pct else produit.prix
             prix_original_promo = produit.prix if pct else None
 
-            # Conversion vers la devise active de la caisse
+            # Conversion vers la devise active de la caisse avec le taux actif
             prix_converti = convertir(prix_apres_promo, produit.devise,
-                                      params.devise_active, params.taux_change_usd_fc)
+                                      params.devise_active, taux)
             prix_original_converti = (
                 convertir(prix_original_promo, produit.devise,
-                          params.devise_active, params.taux_change_usd_fc)
+                          params.devise_active, taux)
                 if prix_original_promo else None
             )
 
@@ -711,7 +751,7 @@ def caisse_valider():
             agent_id=session['user_id'],
             total=round(total, 4),
             devise=params.devise_active,
-            taux_change_utilise=params.taux_change_usd_fc,
+            taux_change_utilise=taux,   # taux en vigueur au moment exact de la vente
             numero_recu=numero,
             multi_devises=multi_devises,
         )
@@ -966,7 +1006,7 @@ def api_dashboard_stats():
             'stock_bas': stock_bas_list,
             'ventes_cat': ventes_cat,
             'devise': params.devise_active,
-            'taux': params.taux_change_usd_fc,
+            'taux': get_taux_actif(),
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1070,6 +1110,18 @@ def parametres():
             taux_val = float(taux_raw)
             if taux_val <= 0:
                 raise ValueError("Le taux doit être positif.")
+            # Si le taux change → on crée un enregistrement immuable dans l'historique
+            if abs(taux_val - get_taux_actif()) > 0.001:
+                ht = HistoriqueTaux(
+                    taux=taux_val,
+                    note=f"Taux modifié par {session.get('nom', 'admin')}",
+                    user_id=session.get('user_id')
+                )
+                db.session.add(ht)
+                log_audit('NOUVEAU_TAUX',
+                          f"Nouveau taux : 1 $ = {int(taux_val)} FC",
+                          ancienne_valeur=str(get_taux_actif()),
+                          nouvelle_valeur=str(taux_val))
             params.taux_change_usd_fc = taux_val
 
             params.adresse = request.form.get('adresse', '').strip() or None
@@ -1109,7 +1161,49 @@ def parametres():
         except Exception:
             db.session.rollback()
             flash('Erreur lors de la mise à jour.', 'danger')
-    return render_template('parametres.html', params=params)
+    historique_taux = HistoriqueTaux.query.order_by(
+        HistoriqueTaux.date_debut.desc()).limit(50).all()
+    taux_actif = get_taux_actif()
+    return render_template('parametres.html', params=params,
+                           historique_taux=historique_taux,
+                           taux_actif=taux_actif)
+
+
+# ──────────────────────────────────────────────────────────
+# Admin — Blocage / déblocage global des agents
+# ──────────────────────────────────────────────────────────
+@app.route('/admin/lock-all-agents', methods=['POST'])
+@admin_required
+def lock_all_agents():
+    try:
+        count = User.query.filter_by(role='agent').update({'actif': False})
+        db.session.commit()
+        log_audit('BLOCAGE_AGENTS',
+                  f"Tous les agents bloqués ({count}) — magasin fermé",
+                  nouvelle_valeur='actif=False')
+        flash(f'✓ {count} agent(s) bloqué(s). Le magasin est fermé.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Erreur lors du blocage des agents.', 'danger')
+        app.logger.error(f"lock_all_agents: {e}")
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/admin/unlock-all-agents', methods=['POST'])
+@admin_required
+def unlock_all_agents():
+    try:
+        count = User.query.filter_by(role='agent').update({'actif': True})
+        db.session.commit()
+        log_audit('DEBLOCAGE_AGENTS',
+                  f"Tous les agents débloqués ({count}) — magasin ouvert",
+                  nouvelle_valeur='actif=True')
+        flash(f'✓ {count} agent(s) réactivé(s). Le magasin est ouvert.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Erreur lors du déblocage des agents.', 'danger')
+        app.logger.error(f"unlock_all_agents: {e}")
+    return redirect(url_for('dashboard'))
 
 
 # ──────────────────────────────────────────────────────────

@@ -91,27 +91,27 @@
         </p>
       </div>
       <div class="form-group">
-        <label for="taux_change">Taux de change officiel (1&nbsp;$&nbsp;=&nbsp;?&nbsp;FC)</label>
+        <label for="taux_change">Nouveau taux de change (1&nbsp;$&nbsp;=&nbsp;?&nbsp;FC)</label>
         <div class="input-with-suffix">
           <input type="number" id="taux_change" name="taux_change"
-                 value="{{ params.taux_change_usd_fc | int }}" min="1" step="1"
+                 value="{{ taux_actif | int }}" min="1" step="1"
                  placeholder="2230">
           <span class="input-suffix">FC / $</span>
         </div>
         <p class="form-hint">
-          Exemple : saisissez <strong>2230</strong> si 1&nbsp;$ = 2&nbsp;230&nbsp;FC.
-          Ce taux est appliqué à chaque vente pour convertir les produits en dollars
-          vers la devise de la caisse, et vice-versa. Le taux utilisé est enregistré
-          sur chaque reçu pour traçabilité.
+          Chaque modification enregistre un <strong>nouveau taux</strong> en base.
+          Les ventes déjà effectuées conservent le taux en vigueur au moment de la vente.
+          Le taux actif est toujours le plus récent.
         </p>
       </div>
     </div>
 
-    <div class="info-box">
-      <strong>Note :</strong> Chaque produit peut être saisi dans sa propre devise (FC ou USD).
-      Lorsqu'un client achète des produits en devises différentes, la caisse convertit
-      automatiquement tout au taux configuré ici. Le changement de devise ou de taux
-      ne modifie pas l'historique des ventes passées.
+    <div class="info-box" style="align-items:flex-start">
+      <svg viewBox="0 0 24 24" width="16" height="16" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>
+        <strong>Taux historique :</strong> modifier le taux ne recalcule <em>jamais</em> les ventes passées.
+        Chaque reçu conserve le taux du moment. L'historique complet est affiché ci-dessous.
+      </span>
     </div>
 
     {# ── Seuils opérationnels ───────────────────────────── #}
@@ -142,6 +142,48 @@
       <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">Annuler</a>
     </div>
   </form>
+</div>
+
+{# ── Historique des taux de change ─────────────────────── #}
+<div class="card" style="margin-top:24px">
+  <div class="card-header">
+    <h3>Historique des taux de change</h3>
+    <span class="badge-hint">Les ventes utilisent le taux en vigueur à leur date</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Taux (FC / $)</th>
+          <th>Date d'entrée en vigueur</th>
+          <th>Note</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if historique_taux %}
+          {% for ht in historique_taux %}
+          <tr {% if loop.first %}class="row-highlight"{% endif %}>
+            <td class="fw-bold">1&nbsp;$ = {{ ht.taux | int }}&nbsp;FC</td>
+            <td>{{ ht.date_debut.strftime('%d/%m/%Y à %H:%M') }}</td>
+            <td class="text-muted">{{ ht.note or '—' }}</td>
+            <td>
+              {% if loop.first %}
+                <span class="badge badge-success">Actif</span>
+              {% else %}
+                <span class="badge badge-inactive">Archivé</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="4" class="text-center text-muted" style="padding:24px">
+            Aucun historique — le taux actuel sera enregistré à la prochaine modification.
+          </td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
 

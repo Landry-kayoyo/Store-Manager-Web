@@ -11,6 +11,47 @@
 {% block content %}
 {% if session.get('role') == 'admin' %}
 <!-- ── VUE ADMIN ───────────────────────────────────────── -->
+
+{# ── Panneau ouverture / fermeture magasin ── #}
+<div class="card magasin-control-card">
+  <div class="magasin-status-row">
+    <div class="magasin-status-info">
+      {% if agents_bloques == 0 %}
+        <span class="status-dot status-open"></span>
+        <div>
+          <strong>Magasin ouvert</strong>
+          <p>{{ agents_actifs_count }} agent(s) actif(s) — les ventes sont autorisées.</p>
+        </div>
+      {% else %}
+        <span class="status-dot status-closed"></span>
+        <div>
+          <strong>Magasin fermé</strong>
+          <p>{{ agents_bloques }} agent(s) bloqué(s) — aucune vente possible.</p>
+        </div>
+      {% endif %}
+    </div>
+    <div class="magasin-control-btns">
+      {% if agents_bloques == 0 %}
+      <form method="POST" action="{{ url_for('lock_all_agents') }}" onsubmit="return confirm('Bloquer tous les agents ? Les ventes seront impossibles jusqu\'à réouverture.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger">
+          <svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Fermer le magasin
+        </button>
+      </form>
+      {% else %}
+      <form method="POST" action="{{ url_for('unlock_all_agents') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success">
+          <svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+          Ouvrir le magasin
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 <div class="kpi-grid" id="kpi-grid">
   <div class="kpi-card loading" id="kpi-ca"><div class="kpi-label">CA aujourd'hui</div><div class="kpi-value" id="kpi-ca-val">—</div></div>
   <div class="kpi-card loading" id="kpi-ventes"><div class="kpi-label">Ventes aujourd'hui</div><div class="kpi-value" id="kpi-ventes-val">—</div></div>

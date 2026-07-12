@@ -156,6 +156,19 @@ class Parametres(db.Model):
         return f'<Parametres {self.nom_magasin}>'
 
 
+class HistoriqueTaux(db.Model):
+    """Historique immuable des taux de change. Chaque modification crée un enregistrement."""
+    __tablename__ = 'historique_taux'
+    id = db.Column(db.Integer, primary_key=True)
+    taux = db.Column(db.Float, nullable=False)
+    date_debut = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    note = db.Column(db.String(200), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    def __repr__(self):
+        return f'<HistoriqueTaux {self.taux} FC/$ depuis {self.date_debut}>'
+
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
     id = db.Column(db.Integer, primary_key=True)
