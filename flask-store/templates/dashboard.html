@@ -52,6 +52,15 @@
   </div>
 </div>
 
+{# ── Bande info : taux actif ── #}
+<div class="dashboard-info-band">
+  <span>
+    <svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:middle"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    Taux actif : <strong id="taux-actif-val">—</strong>
+  </span>
+  <a href="{{ url_for('parametres') }}" class="link-sm">Modifier →</a>
+</div>
+
 <div class="kpi-grid" id="kpi-grid">
   <div class="kpi-card loading" id="kpi-ca"><div class="kpi-label">CA aujourd'hui</div><div class="kpi-value" id="kpi-ca-val">—</div></div>
   <div class="kpi-card loading" id="kpi-ventes"><div class="kpi-label">Ventes aujourd'hui</div><div class="kpi-value" id="kpi-ventes-val">—</div></div>

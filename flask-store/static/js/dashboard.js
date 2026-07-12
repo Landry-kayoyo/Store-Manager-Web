@@ -1,14 +1,30 @@
-/* dashboard.js — stats admin asynchrones + Chart.js */
+/* dashboard.js — stats admin + statistiques page, Chart.js */
 
 const GREEN   = '#1A3A2A';
-const GOLD    = '#C89B3C';
 const PALETTE = ['#1A3A2A','#C89B3C','#2D7D46','#D97706','#2563EB','#7C3AED','#DB2777','#0891B2'];
 
 let _devise = 'FC';
 let _taux   = 2800;
 
-document.addEventListener('DOMContentLoaded', loadStats);
+document.addEventListener('DOMContentLoaded', () => {
+  loadStats();
+  startClock();
+});
 
+/* ── Horloge ─────────────────────────────────────────────── */
+function startClock() {
+  function tick() {
+    const now  = new Date();
+    const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const date = now.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    const el   = document.getElementById('topbar-clock');
+    if (el) el.innerHTML = `<span class="clock-time">${time}</span><br><span>${date}</span>`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+/* ── Chargement des stats (appelé par les deux pages) ────── */
 function loadStats() {
   fetch('/api/dashboard-stats')
     .then(r => r.json())
@@ -21,38 +37,47 @@ function loadStats() {
       renderTopAgents(data.top_agents);
       renderStockBas(data.stock_bas);
       renderChartCategories(data.ventes_cat);
-      document.querySelectorAll('.kpi-card').forEach(el => el.classList.remove('loading'));
+      document.querySelectorAll('.kpi-card.loading').forEach(el => el.classList.remove('loading'));
+      const overlay = document.getElementById('stats-loading');
+      if (overlay) overlay.style.display = 'none';
     })
     .catch(err => console.error('Erreur chargement stats:', err));
 }
 
-/* ── $ en gros, FC en petit dessous — toujours ── */
+/* ── $ en gros, FC en petit dessous ── */
 function fmt(val) {
   const fc  = _devise === 'FC' ? val : val * _taux;
   const usd = _devise === 'USD' ? val : val / _taux;
   return `$${usd.toFixed(2)} <small class="kpi-equiv">${Math.round(fc).toLocaleString('fr-FR')} FC</small>`;
 }
 
-/* Version courte pour axes graphiques */
+/* Version courte pour axes */
 function fmtCourt(val) {
-  if (val >= 1000000) return '$' + (val/1000000).toFixed(1) + 'M';
-  if (val >= 1000)    return '$' + (val/1000).toFixed(0) + 'k';
-  return '$' + Math.round(val);
+  const usd = _devise === 'FC' ? val / _taux : val;
+  if (usd >= 1000) return '$' + (usd/1000).toFixed(0) + 'k';
+  return '$' + Math.round(usd);
 }
 
-/* ── KPIs ─────────────────────────────────────────────── */
+/* ── KPIs — remplit dashboard.html ET statistiques.html ─── */
 function fillKPIs(d) {
+  // dashboard.html
   setHtml('kpi-ca-val',     fmt(d.ca_jour));
   setText('kpi-ventes-val', d.nb_ventes_jour);
   setText('kpi-stock-val',  d.stock_bas_count);
   setText('kpi-agents-val', d.agents_actifs);
+  // statistiques.html
+  setHtml('s-ca-jour',   fmt(d.ca_jour));
+  setText('s-nb-jour',   d.nb_ventes_jour);
+  setText('s-stock-bas', d.stock_bas_count);
+  setText('s-agents',    d.agents_actifs);
+  // Taux actif (dashboard banner)
+  setText('taux-actif-val', `1 $ = ${Math.round(_taux)} FC`);
 }
 
-/* ── Graphique ventes 7j ─────────────────────────────── */
+/* ── Graphique ventes 7j ─────────────────────────────────── */
 function renderChartVentes(ventes7j) {
   const el = document.getElementById('chartVentes');
   if (!el) return;
-  // Convertit en USD pour l'axe (valeur stockée en devise active)
   const toUsd = v => _devise === 'FC' ? v / _taux : v;
   new Chart(el, {
     type: 'line',
@@ -72,25 +97,21 @@ function renderChartVentes(ventes7j) {
         tooltip: {
           callbacks: {
             label: ctx => {
-              const usd = ctx.raw;
-              const fc  = Math.round(usd * _taux).toLocaleString('fr-FR');
-              return [` $${usd.toFixed(2)}`, ` ${fc} FC`];
+              const fc = Math.round(ctx.raw * _taux).toLocaleString('fr-FR');
+              return [` $${ctx.raw.toFixed(2)}`, ` ${fc} FC`];
             }
           }
         }
       },
       scales: {
-        y: {
-          ticks: { callback: v => fmtCourt(v) },
-          grid: { color: '#E2DDD6' }
-        },
+        y: { ticks: { callback: v => fmtCourt(v) }, grid: { color: '#E2DDD6' } },
         x: { grid: { display: false } }
       }
     }
   });
 }
 
-/* ── Graphique catégories ────────────────────────────── */
+/* ── Graphique catégories ────────────────────────────────── */
 function renderChartCategories(cats) {
   const el = document.getElementById('chartCategories');
   if (!el || !cats.length) return;
@@ -112,9 +133,8 @@ function renderChartCategories(cats) {
         tooltip: {
           callbacks: {
             label: ctx => {
-              const usd = ctx.raw;
-              const fc  = Math.round(usd * _taux).toLocaleString('fr-FR');
-              return ` ${ctx.label}: $${usd.toFixed(2)} / ${fc} FC`;
+              const fc = Math.round(ctx.raw * _taux).toLocaleString('fr-FR');
+              return ` ${ctx.label}: $${ctx.raw.toFixed(2)} / ${fc} FC`;
             }
           }
         }
@@ -123,7 +143,7 @@ function renderChartCategories(cats) {
   });
 }
 
-/* ── Top agents ──────────────────────────────────────── */
+/* ── Top agents ──────────────────────────────────────────── */
 function renderTopAgents(agents) {
   const el = document.getElementById('top-agents-container');
   if (!el) return;
@@ -132,7 +152,7 @@ function renderTopAgents(agents) {
     return;
   }
   el.innerHTML = agents.map((a, i) => {
-    const av = a.photo
+    const av  = a.photo
       ? `<img src="/uploads/${a.photo}" alt="" class="avatar">`
       : `<div class="avatar avatar-initial">${esc(a.nom[0])}</div>`;
     const fc  = _devise === 'FC' ? a.montant : a.montant * _taux;
@@ -149,7 +169,7 @@ function renderTopAgents(agents) {
   }).join('');
 }
 
-/* ── Stock bas ───────────────────────────────────────── */
+/* ── Stock bas ───────────────────────────────────────────── */
 function renderStockBas(items) {
   const el = document.getElementById('stock-bas-container');
   if (!el) return;
@@ -165,15 +185,7 @@ function renderStockBas(items) {
   }).join('');
 }
 
-/* ── Utilitaires ─────────────────────────────────────── */
-function setText(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = val;
-}
-function setHtml(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = val;
-}
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+/* ── Utilitaires ─────────────────────────────────────────── */
+function setText(id, val) { const e = document.getElementById(id); if (e) e.textContent = val; }
+function setHtml(id, val) { const e = document.getElementById(id); if (e) e.innerHTML = val; }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

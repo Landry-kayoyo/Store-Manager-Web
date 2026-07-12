@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% block title %}Chat support — {{ params.nom_magasin }}{% endblock %}
+{% block page_title %}Chat support{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+
+  {% if session.get('role') == 'admin' %}
+  {# ── Panneau gauche : liste des agents ─────────────── #}
+  <div class="chat-agents-panel">
+    <div class="chat-agents-header">
+      <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right:6px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Agents
+    </div>
+    <div class="chat-agents-list" id="agents-list">
+      {% for a in agents %}
+      <a class="chat-agent-item {% if selected_id == a.id %}active{% endif %}"
+         href="?agent_id={{ a.id }}" data-agent-id="{{ a.id }}">
+        {% if a.photo_profil %}
+          <img src="{{ url_for('uploaded_file', filename=a.photo_profil) }}" alt="" class="avatar" style="width:34px;height:34px">
+        {% else %}
+          <div class="avatar avatar-initial" style="width:34px;height:34px;font-size:.9rem">{{ a.nom[0] }}</div>
+        {% endif %}
+        <div class="agent-info">
+          <div class="agent-name">{{ a.nom }}</div>
+          <div class="agent-last">{{ 'En ligne' if a.actif else 'Inactif' }}</div>
+        </div>
+        {% if unread_by.get(a.id, 0) > 0 %}
+          <span class="chat-unread-badge" id="badge-{{ a.id }}">{{ unread_by[a.id] }}</span>
+        {% endif %}
+      </a>
+      {% else %}
+      <p style="padding:20px;color:var(--text-muted);font-size:.85rem">Aucun agent enregistré.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Panneau principal : conversation ─────────────── #}
+  <div class="chat-main">
+    {% if other_user %}
+    <div class="chat-header">
+      {% if other_user.photo_profil %}
+        <img src="{{ url_for('uploaded_file', filename=other_user.photo_profil) }}" class="avatar" style="width:34px;height:34px" alt="">
+      {% else %}
+        <div class="avatar avatar-initial" style="width:34px;height:34px;font-size:.9rem">{{ other_user.nom[0] }}</div>
+      {% endif %}
+      <div>
+        <strong>{{ other_user.nom }}</strong>
+        <small style="color:var(--text-muted);display:block;font-size:.75rem">
+          {{ 'Administrateur' if other_user.role == 'admin' else 'Agent' }}
+        </small>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+      <div style="text-align:center;color:var(--text-muted);font-size:.8rem;padding:16px 0">
+        Chargement de la conversation…
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <textarea id="chat-input" class="chat-input" placeholder="Tapez votre message…" rows="1"
+                onkeydown="handleKey(event)"></textarea>
+      <button class="btn btn-primary" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+
+    {% else %}
+    {# Aucun agent sélectionné (côté admin) #}
+    <div class="chat-empty">
+      <svg viewBox="0 0 24 24" width="48" height="48" style="color:var(--border)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <p>Sélectionnez un agent pour voir la conversation.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const OTHER_ID   = {{ other_user.id if other_user else 'null' }};
+const MY_ID      = {{ session.get('user_id') }};
+const IS_ADMIN   = {{ 'true' if session.get('role') == 'admin' else 'false' }};
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
+let lastId = 0;
+
+if (OTHER_ID) {
+  loadMessages(true);
+  setInterval(() => loadMessages(false), 3000);
+}
+
+/* ── Chargement des messages ─── */
+function loadMessages(initial) {
+  const url = `/api/chat/messages?other_id=${OTHER_ID}&since_id=${initial ? 0 : lastId}`;
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) return;
+      const box = document.getElementById('chat-messages');
+      if (!box) return;
+
+      if (initial) box.innerHTML = '';
+
+      data.messages.forEach(m => {
+        if (m.id <= lastId) return;
+        lastId = Math.max(lastId, m.id);
+        const div = document.createElement('div');
+        div.className = 'msg-bubble ' + (m.is_mine ? 'msg-sent' : 'msg-recv');
+        div.innerHTML = esc(m.contenu).replace(/\n/g, '<br>')
+          + `<span class="msg-time">${m.date}</span>`;
+        box.appendChild(div);
+      });
+
+      if (initial || data.messages.length) {
+        box.scrollTop = box.scrollHeight;
+      }
+
+      // Mise à jour du badge non-lus dans la sidebar
+      updateUnreadBadge();
+    })
+    .catch(console.error);
+}
+
+/* ── Envoi d'un message ──────── */
+function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
+  if (!text || !OTHER_ID) return;
+
+  input.value = '';
+  input.style.height = '';
+
+  fetch('/api/chat/envoyer', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF_TOKEN,
+    },
+    body: JSON.stringify({ receiver_id: OTHER_ID, contenu: text }),
+  })
+  .then(r => r.json())
+  .then(m => {
+    if (m.error) { alert(m.error); return; }
+    const box = document.getElementById('chat-messages');
+    lastId = Math.max(lastId, m.id);
+    const div = document.createElement('div');
+    div.className = 'msg-bubble msg-sent';
+    div.innerHTML = esc(m.contenu).replace(/\n/g, '<br>')
+      + `<span class="msg-time">${m.date}</span>`;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  })
+  .catch(console.error);
+}
+
+/* ── Entrée : Entrée envoie, Maj+Entrée = saut de ligne ─ */
+function handleKey(e) {
+  const input = document.getElementById('chat-input');
+  // Auto-expand
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+/* ── Badge non-lus dans la sidebar ─ */
+function updateUnreadBadge() {
+  fetch('/api/chat/non-lus')
+    .then(r => r.json())
+    .then(d => {
+      const badge = document.getElementById('nav-chat-badge');
+      if (!badge) return;
+      if (d.count > 0) {
+        badge.textContent = d.count;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    }).catch(() => {});
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

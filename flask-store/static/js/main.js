@@ -1,4 +1,4 @@
-/* main.js — utilitaires partagés */
+/* main.js — utilitaires partagés (toutes les pages) */
 
 // ── Toggle sidebar mobile ────────────────────────────────
 function toggleSidebar() {
@@ -14,8 +14,8 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// ── Auto-fermer les alertes après 5 s ────────────────────
 document.addEventListener('DOMContentLoaded', function() {
+  // ── Auto-fermer les alertes après 5 s ─────────────────
   document.querySelectorAll('.alert').forEach(function(alert) {
     setTimeout(function() {
       if (alert && alert.parentNode) {
@@ -26,22 +26,52 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 5000);
   });
 
-  // ── Recherche dynamique ──────────────────────────────
+  // ── Horloge topbar ────────────────────────────────────
+  startClock();
+
+  // ── Badge non-lus du chat ────────────────────────────
+  pollUnreadBadge();
+  setInterval(pollUnreadBadge, 30000);
+
+  // ── Recherche dynamique ───────────────────────────────
   initLiveSearch();
 });
 
-/**
- * Recherche dynamique côté client.
- * Cherche un <input id="produit-search"> OU <input class="input-search live-search">
- * et filtre les lignes du premier <tbody> visible sur la page.
- *
- * Les champs de filtre serveur (select, bouton Filtrer) sont désactivés
- * seulement si on tape une valeur — sinon ils restent actifs.
- */
+/* Horloge — mise à jour chaque seconde */
+function startClock() {
+  function tick() {
+    const now  = new Date();
+    const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const date = now.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+    const el   = document.getElementById('topbar-clock');
+    if (el) el.innerHTML = `<span class="clock-time">${time}</span><br>${date}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+/* Badge non-lus dans la nav */
+function pollUnreadBadge() {
+  fetch('/api/chat/non-lus')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d) return;
+      const badge = document.getElementById('nav-chat-badge');
+      if (!badge) return;
+      if (d.count > 0) {
+        badge.textContent = d.count;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    })
+    .catch(() => {});
+}
+
+/* Recherche dynamique côté client */
 function initLiveSearch() {
-  // Cherche les inputs marqués live-search
   document.querySelectorAll('input.live-search').forEach(input => {
-    const targetId = input.dataset.target; // id du tbody cible (optionnel)
+    const targetId = input.dataset.target;
     input.addEventListener('input', function() {
       const q = this.value.trim().toLowerCase();
       const tbody = targetId
@@ -52,7 +82,6 @@ function initLiveSearch() {
         const text = row.textContent.toLowerCase();
         row.style.display = q === '' || text.includes(q) ? '' : 'none';
       });
-      // Afficher/masquer le message "aucun résultat"
       const visibles = [...tbody.querySelectorAll('tr')].filter(r => r.style.display !== 'none');
       let emptyRow = tbody.querySelector('.live-empty');
       if (q && !visibles.length) {

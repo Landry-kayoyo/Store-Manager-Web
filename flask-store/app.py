@@ -87,7 +87,7 @@ else:
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 DEVISES = ['FC', 'USD']
 
-from models import db, User, Produit, Vente, LigneVente, Promotion, Parametres, AuditLog, HistoriqueTaux
+from models import db, User, Produit, Vente, LigneVente, Promotion, Parametres, AuditLog, HistoriqueTaux, ChatMessage
 db.init_app(app)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -168,6 +168,24 @@ def run_migrations():
         """)
         cur.execute("CREATE INDEX ix_historique_taux_date ON historique_taux (date_debut)")
         app.logger.info("Migration : table historique_taux créée.")
+
+    # ── ChatMessage (table entière si absente) ──────────────
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chat_messages'")
+    if not cur.fetchone():
+        cur.execute("""
+            CREATE TABLE chat_messages (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id   INTEGER NOT NULL REFERENCES users(id),
+                receiver_id INTEGER NOT NULL REFERENCES users(id),
+                contenu     TEXT    NOT NULL,
+                date_envoi  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                lu          INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        cur.execute("CREATE INDEX ix_chat_sender   ON chat_messages (sender_id)")
+        cur.execute("CREATE INDEX ix_chat_receiver ON chat_messages (receiver_id)")
+        cur.execute("CREATE INDEX ix_chat_date     ON chat_messages (date_envoi)")
+        app.logger.info("Migration : table chat_messages créée.")
 
     conn.commit()
     conn.close()
@@ -1204,6 +1222,137 @@ def unlock_all_agents():
         flash('Erreur lors du déblocage des agents.', 'danger')
         app.logger.error(f"unlock_all_agents: {e}")
     return redirect(url_for('dashboard'))
+
+
+# ──────────────────────────────────────────────────────────
+# Chat support — Agent ↔ Admin
+# ──────────────────────────────────────────────────────────
+@app.route('/chat')
+@login_required
+def chat():
+    params = get_params()
+    user_id = session['user_id']
+
+    if session.get('role') == 'admin':
+        agents = User.query.filter_by(role='agent').order_by(User.nom).all()
+        # Nombre de messages non-lus par agent
+        unread_by = {}
+        for a in agents:
+            c = ChatMessage.query.filter_by(
+                sender_id=a.id, receiver_id=user_id, lu=False).count()
+            if c:
+                unread_by[a.id] = c
+
+        selected_id = request.args.get('agent_id', type=int)
+        other_user  = User.query.get(selected_id) if selected_id else None
+        return render_template('chat.html', params=params,
+                               agents=agents, unread_by=unread_by,
+                               other_user=other_user, selected_id=selected_id)
+    else:
+        # Agent : parle uniquement à l'admin
+        admin = User.query.filter_by(role='admin').order_by(User.id).first()
+        return render_template('chat.html', params=params,
+                               agents=[], unread_by={},
+                               other_user=admin, selected_id=admin.id if admin else None)
+
+
+@app.route('/api/chat/messages')
+@login_required
+def api_chat_messages():
+    """Retourne les messages d'une conversation + marque comme lu."""
+    other_id = request.args.get('other_id', type=int)
+    since_id = request.args.get('since_id', 0, type=int)
+    if not other_id:
+        return jsonify({'error': 'other_id requis'}), 400
+
+    user_id = session['user_id']
+    msgs = ChatMessage.query.filter(
+        db.or_(
+            db.and_(ChatMessage.sender_id == user_id,
+                    ChatMessage.receiver_id == other_id),
+            db.and_(ChatMessage.sender_id == other_id,
+                    ChatMessage.receiver_id == user_id),
+        ),
+        ChatMessage.id > since_id
+    ).order_by(ChatMessage.date_envoi).all()
+
+    # Marquer comme lus les messages reçus
+    to_read = [m for m in msgs if m.receiver_id == user_id and not m.lu]
+    if to_read:
+        for m in to_read:
+            m.lu = True
+        db.session.commit()
+
+    return jsonify({'messages': [{
+        'id':       m.id,
+        'sender_id': m.sender_id,
+        'contenu':  m.contenu,
+        'date':     m.date_envoi.strftime('%H:%M'),
+        'is_mine':  m.sender_id == user_id,
+    } for m in msgs]})
+
+
+@app.route('/api/chat/envoyer', methods=['POST'])
+@login_required
+@csrf.exempt
+def api_chat_envoyer():
+    """Envoie un message (JSON). Validation CSRF via header."""
+    token = request.headers.get('X-CSRFToken', '')
+    from flask_wtf.csrf import validate_csrf
+    try:
+        validate_csrf(token)
+    except Exception:
+        return jsonify({'error': 'Token CSRF invalide.'}), 400
+
+    data        = request.get_json() or {}
+    receiver_id = data.get('receiver_id')
+    contenu     = (data.get('contenu') or '').strip()
+
+    if not contenu:
+        return jsonify({'error': 'Message vide.'}), 400
+    if len(contenu) > 2000:
+        return jsonify({'error': 'Message trop long (max 2000 caractères).'}), 400
+    if not receiver_id:
+        return jsonify({'error': 'Destinataire manquant.'}), 400
+
+    receiver = User.query.get(int(receiver_id))
+    if not receiver:
+        return jsonify({'error': 'Destinataire introuvable.'}), 400
+
+    # Règle : agent → admin seulement ; admin → agent seulement
+    role = session.get('role')
+    if role == 'agent' and receiver.role != 'admin':
+        return jsonify({'error': 'Les agents ne peuvent contacter que l\'administrateur.'}), 403
+    if role == 'admin' and receiver.role == 'admin':
+        return jsonify({'error': 'Destinataire invalide.'}), 403
+
+    msg = ChatMessage(
+        sender_id=session['user_id'],
+        receiver_id=int(receiver_id),
+        contenu=contenu,
+    )
+    db.session.add(msg)
+    # Audit — traçabilité complète de chaque message
+    log_audit('CHAT_MESSAGE',
+              f"{session.get('nom', '?')} → {receiver.nom} : {contenu[:80]}{'…' if len(contenu) > 80 else ''}")
+    db.session.commit()
+
+    return jsonify({
+        'id':       msg.id,
+        'sender_id': msg.sender_id,
+        'contenu':  msg.contenu,
+        'date':     msg.date_envoi.strftime('%H:%M'),
+        'is_mine':  True,
+    })
+
+
+@app.route('/api/chat/non-lus')
+@login_required
+def api_chat_non_lus():
+    """Compte les messages non-lus pour le badge de navigation."""
+    count = ChatMessage.query.filter_by(
+        receiver_id=session['user_id'], lu=False).count()
+    return jsonify({'count': count})
 
 
 # ──────────────────────────────────────────────────────────

@@ -169,6 +169,23 @@ class HistoriqueTaux(db.Model):
         return f'<HistoriqueTaux {self.taux} FC/$ depuis {self.date_debut}>'
 
 
+class ChatMessage(db.Model):
+    """Messages entre agents et admin (support interne)."""
+    __tablename__ = 'chat_messages'
+    id          = db.Column(db.Integer, primary_key=True)
+    sender_id   = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    contenu     = db.Column(db.Text, nullable=False)
+    date_envoi  = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    lu          = db.Column(db.Boolean, default=False, nullable=False)
+
+    sender   = db.relationship('User', foreign_keys=[sender_id],   backref='messages_envoyes')
+    receiver = db.relationship('User', foreign_keys=[receiver_id], backref='messages_recus')
+
+    def __repr__(self):
+        return f'<ChatMessage {self.sender_id}→{self.receiver_id} {self.date_envoi:%H:%M}>'
+
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
     id = db.Column(db.Integer, primary_key=True)
